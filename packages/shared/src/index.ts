@@ -16,3 +16,4 @@ export { ITEM_KINDS, dropAll, dropSelected, itemCountFor, loadIntoTruck, nearest
 export { advanceClock, checkAllDead, createWorld, inTruckZone, rechargeInTruck, resolveDeparture, spawnWatcher, updateDepartHold } from './round.ts';
 export { emitNoise } from './noise.ts';
 export { startRetreat, stalkerContacts, updateStalker } from './monsters/stalker.ts';
+export { isWatcherLit, updateWatcher, watcherContacts } from './monsters/watcher.ts';
