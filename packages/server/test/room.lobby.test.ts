@@ -55,6 +55,17 @@ describe('RoundRoom 대기실', () => {
     expect(guest.state.players.get(host.sessionId)?.name).toBe('철수');
   });
 
+  it('방은 비공개: joinOrCreate·join으로 남의 방에 섞이지 않고, 코드(joinById)로만 들어간다', async () => {
+    const { room } = await create('철수');
+    const stranger = await colyseus.sdk.joinOrCreate('round', opts('낯선이'));
+    expect(stranger.roomId).not.toBe(room.roomId);
+    // 공개된 방이 없으므로 join은 실패한다
+    await failure(colyseus.sdk.join('round', opts('낯선이2')));
+    expect(room.state.players.size).toBe(1);
+    const guest = await colyseus.sdk.joinById(room.roomId, opts('영희'));
+    expect(guest.roomId).toBe(room.roomId);
+  });
+
   it('5번째 입장은 4001 ROOM_FULL', async () => {
     const { room } = await create('a');
     for (const n of ['b', 'c', 'd']) await colyseus.sdk.joinById(room.roomId, opts(n));

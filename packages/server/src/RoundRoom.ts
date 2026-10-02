@@ -57,6 +57,8 @@ export class RoundRoom extends Room<{ state: RoomState }> {
     let code = generateRoomCode(randomUnit);
     while (await matchMaker.getRoomById(code)) code = generateRoomCode(randomUnit);
     this.roomId = code;
+    // 비공개 방: joinOrCreate/join 매칭에 잡히지 않아 낯선 사람이 섞이지 않는다. 코드(joinById)로만 들어온다.
+    await this.setPrivate(true);
     this.setState(new RoomState());
     this.state.phase = 'lobby';
     console.info({ event: 'roomCreated', roomId: this.roomId });
