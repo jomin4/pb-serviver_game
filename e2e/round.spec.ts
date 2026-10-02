@@ -91,3 +91,30 @@ test('게임 중 Esc로 메뉴가 열린다', async ({ browser }) => {
     await ctxB.close();
   }
 });
+
+test('방 코드 칸: 헷갈리는 문자는 바로 안내하고, 초대 링크를 통째로 붙여 넣어도 입장한다', async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  try {
+    const a = await ctxA.newPage();
+    const b = await ctxB.newPage();
+    await a.goto('/?debug=1');
+    await a.getByTestId('nickname-input').fill('가');
+    await a.getByTestId('create-button').click();
+    const link = await a.getByTestId('invite-link').inputValue();
+
+    await b.goto('/?debug=1');
+    await b.getByTestId('nickname-input').fill('나');
+    await b.getByTestId('code-input').fill('ABCDE0');
+    await b.getByTestId('join-button').click();
+    await expect(b.getByTestId('code-error')).toHaveText('방을 찾을 수 없습니다. 코드를 확인해 주세요');
+
+    await b.getByTestId('code-input').fill(link);
+    await expect(b.getByTestId('code-input')).toHaveValue(link); // 잘리지 않는다
+    await b.getByTestId('join-button').click();
+    await expect(b.getByTestId('player-list').getByTestId('player-item')).toHaveCount(2);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});

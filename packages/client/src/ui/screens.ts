@@ -1,5 +1,6 @@
 import { CONFIG } from '@bh/shared';
 import type { PlayerView, RoomView } from '../net/connection.ts';
+import { parseRoomInput } from '../net/url.ts';
 
 /**
  * 화면 그리기. 상태를 갖지 않는다: 호출할 때마다 #app을 새로 채우고, 사용자 동작은 콜백으로만 알린다.
@@ -62,7 +63,8 @@ export function showHome(
   });
   const nameError = h('p', { class: 'field-error', testid: 'nickname-error', role: 'alert' });
   const codeInput = h('input', {
-    type: 'text', testid: 'code-input', maxlength: '8', placeholder: '방 코드 6자리',
+    // 초대 링크를 통째로 붙여 넣어도 잘리지 않게 넉넉히 둔다(입장할 때 parseRoomInput으로 정규화).
+    type: 'text', testid: 'code-input', maxlength: '256', placeholder: '방 코드 6자리 또는 초대 링크',
     autocomplete: 'off', autocapitalize: 'characters', value: opts.code ?? '',
   });
   const codeError = h('p', { class: 'field-error', testid: 'code-error', role: 'alert' });
@@ -72,7 +74,8 @@ export function showHome(
     nameError.textContent = name === null ? NICKNAME_HINT : '';
     return name;
   };
-  const trimmedCode = (): string => codeInput.value.replace(/\s+/g, '').toUpperCase();
+  /** 입력칸 값(코드 또는 붙여 넣은 초대 링크) → 방 코드. 형식이 틀리면 null. */
+  const typedCode = (): string | null => parseRoomInput(codeInput.value);
 
   let touched = nameInput.value !== '';
   nameInput.addEventListener('input', () => { touched = true; checkName(); });
@@ -82,9 +85,9 @@ export function showHome(
     const name = checkName();
     if (name !== null) onCreate(name);
   };
-  const join = (code: string): void => {
+  const join = (code: string | null): void => {
     const name = checkName();
-    if (!/^[A-Z0-9]{6}$/.test(code)) { codeError.textContent = CODE_HINT; return; }
+    if (code === null) { codeError.textContent = CODE_HINT; return; }
     codeError.textContent = '';
     if (name !== null) onJoin(code, name);
   };
@@ -104,9 +107,9 @@ export function showHome(
     );
   } else {
     const joinButton = h('button', { type: 'button', class: 'secondary', testid: 'join-button' }, '입장');
-    joinButton.addEventListener('click', () => join(trimmedCode()));
+    joinButton.addEventListener('click', () => join(typedCode()));
     nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') create(); });
-    codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') join(trimmedCode()); });
+    codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') join(typedCode()); });
     codeInput.addEventListener('input', () => { codeError.textContent = ''; });
     mount(
       h('h1', {}, '지하주차장'),
