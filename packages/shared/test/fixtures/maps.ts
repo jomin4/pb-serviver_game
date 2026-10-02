@@ -90,3 +90,22 @@ export const solid2x1: MapData = {
   ...noStairs,
   zones: [],
 };
+
+/**
+ * 차량 칸 충돌 테스트용 맵. B1(층 0)은 8×3 열린 바닥에 'C' 블록 하나((4,1))가 있다.
+ * 가장자리에는 벽을 두지 않는다(범위 밖 = 벽). B2(층 1)는 비어 있다.
+ */
+export const carMap: MapData = {
+  id: 'car',
+  floors: [
+    { width: 8, height: 3, rows: ['........', '....C...', '........'] },
+    { width: 8, height: 3, rows: ['........', '........', '........'] },
+  ],
+  truckZone: { x: 0, y: 0, w: 2, h: 2 },
+  spawns: [{ x: 0.5, y: 0.5 }, { x: 1.5, y: 0.5 }, { x: 0.5, y: 1.5 }, { x: 1.5, y: 1.5 }],
+  itemSlots: [],
+  patrolRoutes: [{ floor: 0, points: [{ x: 0.5, y: 2.5 }] }, { floor: 1, points: [{ x: 0.5, y: 2.5 }] }],
+  lights: [],
+  stairs: [],
+  zones: [],
+};

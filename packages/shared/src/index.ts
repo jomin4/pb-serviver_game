@@ -10,3 +10,4 @@ export type { FloorData, MapData, Rect, TileKind } from './map/index.ts';
 export { findPath, pathLength } from './pathfinding.ts';
 export { hasLineOfSight, inFlashlight, visibilityPolygon, wallSegments } from './vision.ts';
 export type { Segment } from './vision.ts';
+export { applyPlayerMovement, applyStairs, moveCircle, playerSpeed, unstick } from './movement.ts';

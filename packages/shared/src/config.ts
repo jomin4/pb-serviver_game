@@ -14,6 +14,7 @@ export const CONFIG = {
     walkSpeed: 3,
     runSpeed: 5,
     staminaMax: 5,
+    staminaDrain: 1,
     staminaRegen: 1,
     hp: 2,
     ambientRadius: 1.5,
@@ -23,6 +24,7 @@ export const CONFIG = {
     interactRange: 1.2,
     departHoldSeconds: 3,
   },
+  movement: { maxStep: 0.25 },
   flashlight: { angle: Math.PI / 3, range: 8, batteryMax: 180 },
   noise: { walk: 1.5, run: 8, drop: 6 },
   items: {
