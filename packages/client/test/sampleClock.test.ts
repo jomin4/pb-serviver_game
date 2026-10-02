@@ -49,4 +49,32 @@ describe('createSampleClock', () => {
     expect(clock.advance(Number.NaN)).toBe(0);
     expect(clock.advance(1 / 60)).toBe(1);
   });
+
+  it('alpha는 다음 샘플까지 쌓인 시간의 비율(0 이상 1 미만)', () => {
+    const clock = createSampleClock(60);
+    expect(clock.alpha()).toBe(0);
+    clock.advance(1 / 120);
+    expect(clock.alpha()).toBeCloseTo(0.5, 9);
+    clock.advance(1 / 60); // 1.5 step → 샘플 1개, 0.5 남음
+    expect(clock.alpha()).toBeCloseTo(0.5, 9);
+    clock.advance(5); // 긴 멈춤 뒤에도 1 미만
+    expect(clock.alpha()).toBeGreaterThanOrEqual(0);
+    expect(clock.alpha()).toBeLessThan(1);
+  });
+
+  it('60Hz 프레임 간격이 흔들려도 (샘플 수 + alpha)는 프레임마다 frameDt/step만큼 고르게 늘어난다', () => {
+    // 실제 60Hz rAF 간격은 16.67ms 근처에서 조금씩 흔들린다. 샘플 수만 보면 0/1/2로 튀지만
+    // 그리는 위치는 (샘플 수 + alpha) 기준으로 보간하므로 프레임마다 거의 1 step씩 고르게 나아가야 한다.
+    const clock = createSampleClock(60);
+    const jitter = [0.3, -0.2, 0.1, -0.3, 0.25, -0.05, 0.15, -0.25];
+    let prevAlpha = clock.alpha();
+    for (let i = 0; i < 600; i++) {
+      const dt = (1000 / 60 + jitter[i % jitter.length]!) / 1000;
+      const n = clock.advance(dt);
+      const alpha = clock.alpha();
+      expect(n + alpha - prevAlpha).toBeCloseTo(dt * 60, 6);
+      prevAlpha = alpha;
+    }
+  });
 });
+

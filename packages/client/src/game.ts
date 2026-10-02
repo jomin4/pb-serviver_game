@@ -7,6 +7,8 @@ import {
   createInputState, onBlur, onKeyDown, onKeyUp, onMouseDown, onMouseMove, onWheel, sampleInput, setSelectedSlot,
 } from './input/keyboard.ts';
 import { createSampleClock } from './input/sampleClock.ts';
+import { blendPose } from './sim/smoothing.ts';
+import type { Pose } from './sim/smoothing.ts';
 import { createSender } from './input/sender.ts';
 import type { GameRoom } from './net/connection.ts';
 import { createCamera } from './render/camera.ts';
@@ -114,6 +116,8 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
   let monsters: MonsterView[] = [];
   let lights: LightState[] = [];
   let self: RenderPlayer | null = null;
+  /** 마지막 샘플을 적용하기 직전의 내 위치. 그릴 때 `self`와 sampleClock.alpha()로 보간한다. */
+  let prevPose: Pose | null = null;
   let seq: number | null = null;
   /** 아직 서버가 처리하지 않은 칸 선택 입력의 seq. 처리될 때까지 서버 값으로 덮지 않는다. */
   let pendingSlotSeq: number | null = null;
@@ -224,25 +228,28 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
     if (!self || !predictor || !renderer || seq === null) return;
 
     const sampled = interpolator.sample(t);
-    // 유령은 예측하지 않으므로 보간한 위치로 본다
-    const ghostPose = !self.alive ? sampled[selfId] : undefined;
-    const viewPos = ghostPose ? ghostPose.pos : self.pos;
-
-    camera.follow(viewPos);
-    if (mouseScreen) onMouseMove(input, camera.screenToWorld(mouseScreen), viewPos);
     // 입력은 rAF 주기가 아니라 고정 빈도(CONFIG.net.inputSampleHz)로 샘플링한다. 엣지 플래그는 샘플링될 때까지
     // InputState에 남아 있으므로 샘플을 만들지 않는 프레임에도 사라지지 않는다. 예측은 샘플마다 고정 dt로 적용한다.
+    // 조준은 직전 프레임에 그린 위치 기준이다(이번 프레임 위치는 샘플을 적용한 뒤에 정해진다).
+    if (mouseScreen && last) onMouseMove(input, camera.screenToWorld(mouseScreen), last.self.pos);
     const samples = sampleClock.advance(dt);
     for (let i = 0; i < samples; i++) {
       const inp = sampleInput(input, seq++);
       if (inp.selectSlot !== null) pendingSlotSeq = inp.seq;
       sender.push(inp);
+      prevPose = { pos: self.pos, floor: self.floor };
       const moved = predictor.apply(inp, self, items, sampleClock.step);
       self = { ...moved, colorIndex: self.colorIndex, aim: input.aim, selectedSlot: inp.selectSlot ?? self.selectedSlot };
     }
     self = { ...self, aim: input.aim };
 
-    const me: RenderPlayer = ghostPose ? { ...self, pos: ghostPose.pos, floor: ghostPose.floor } : self;
+    // 유령은 예측하지 않으므로 보간한 서버 위치로 본다. 살아 있으면 고정 dt 예측 사이를 보간해 그린다
+    // (프레임당 샘플 수가 0/1/2로 흔들려도 캐릭터·카메라가 떨리지 않도록).
+    const ghostPose = !self.alive ? sampled[selfId] : undefined;
+    const shown = ghostPose ?? blendPose(prevPose ?? self, self, sampleClock.alpha());
+    camera.follow(shown.pos);
+
+    const me: RenderPlayer = { ...self, pos: shown.pos, floor: shown.floor };
     const time = currentTime(t);
     pings = pings.filter((p) => p.until > time);
     const others = players.filter((p) => p.id !== selfId).map((p) => {
