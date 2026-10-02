@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
 
 type Debug = { selfId: string | null; getState(): unknown };
-type PlayerJson = { x: number; y: number };
+type PlayerJson = { x: number; y: number; alive?: boolean };
 type StateJson = { players?: Record<string, PlayerJson> } | null;
 
 /** 브라우저 안의 디버그 훅(`?debug=1`)에서 특정 플레이어의 x를 읽는다. 아직 없으면 null. */
@@ -65,6 +65,32 @@ test('두 명이 링크로 모여 라운드를 시작하고 움직인다', async
 
     await expect.poll(async () => ((await playerX(b, idA)) ?? before) - before, { timeout: 10_000 }).toBeGreaterThan(0.5);
     await a.screenshot({ path: 'test-results/game-a.png' });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+/** 브라우저 안의 디버그 훅에서 특정 플레이어의 alive를 읽는다. 아직 없으면 null. */
+async function playerAlive(page: Page, id: string): Promise<boolean | null> {
+  return page.evaluate((who) => {
+    const dbg = (window as unknown as { __bhDebug?: Debug }).__bhDebug;
+    const state = dbg?.getState() as StateJson;
+    return state?.players?.[who]?.alive ?? null;
+  }, id);
+}
+
+test('라운드 중 탭을 닫으면 끊김(재접속 유예)이 아니라 나가기로 처리된다', async ({ browser }) => {
+  const { a, b, ctxA, ctxB } = await startTwoPlayerGame(browser);
+  try {
+    await a.getByTestId('start-button').click();
+    for (const page of [a, b]) await expect(page.getByTestId('game-screen')).toBeVisible();
+    const idB = await selfId(b);
+    await expect.poll(() => playerAlive(a, idB)).toBe(true);
+
+    await b.close();
+    // 끊김이면 재접속 유예(20초) 동안 살아 있다. 나가기면 곧바로 사망 처리된다.
+    await expect.poll(() => playerAlive(a, idB), { timeout: 2_000 }).toBe(false);
   } finally {
     await ctxA.close();
     await ctxB.close();

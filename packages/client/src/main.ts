@@ -25,6 +25,8 @@ let busy = false;
 let recovering = false;
 /** 이 클라이언트가 스스로 나가는 중이면 true. onLeave를 연결 끊김으로 보지 않는다. */
 let leaving = false;
+/** 지금 묶인 방의 pagehide 리스너를 떼는 함수. 방이 바뀌거나 세션이 끝나면 부른다. */
+let unbindPageHide: (() => void) | null = null;
 
 const presetCode = roomFromUrl(location.href);
 
@@ -35,6 +37,8 @@ function stopGame(): void {
 
 function resetSession(): void {
   stopGame();
+  unbindPageHide?.();
+  unbindPageHide = null;
   room = null;
   drawn = '';
   clearReconnectToken();
@@ -65,6 +69,17 @@ function bind(next: GameRoom): void {
   room = next;
   drawn = '';
   leaving = false;
+  // 탭 닫기·새로 고침·다른 주소로 이동은 스스로 나가기다(consented). 그대로 두면 브라우저가 소켓을 1001로 닫아
+  // 서버가 연결 끊김으로 보고 재접속 유예를 준다(스펙: 자발적 나가기는 즉시 사망·소지품 드롭).
+  // 새로 고침도 나가기가 된다: 재접속 토큰은 어차피 페이지를 열 때 지운다.
+  unbindPageHide?.();
+  const pageHide = (): void => {
+    if (room !== next) return;
+    leaving = true;
+    void next.leave(true).catch(() => {});
+  };
+  window.addEventListener('pagehide', pageHide);
+  unbindPageHide = () => window.removeEventListener('pagehide', pageHide);
   next.onStateChange(() => {
     if (room !== next) return;
     render(next);
@@ -160,6 +175,9 @@ async function onUnexpectedLeave(old: GameRoom, code: number): Promise<void> {
     recovering = false;
   }
 }
+
+// pagehide로 방을 나간 뒤 bfcache에서 되살아나면(뒤로 가기) 끊긴 게임 화면 대신 첫 화면을 보여 준다.
+window.addEventListener('pageshow', (e) => { if (e.persisted && leaving) goHome(); });
 
 /** E2E·수동 확인용 디버그 훅(Task 20). 개발 서버이거나 `?debug=1`일 때만 노출한다. */
 if (import.meta.env.DEV || new URLSearchParams(location.search).get('debug') === '1') {
