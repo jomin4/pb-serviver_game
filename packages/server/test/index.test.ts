@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ColyseusSDK } from '@colyseus/sdk';
 import { MAP_IDS } from '@bh/shared';
-import { startServer } from '../src/index.ts';
+import { createServer } from 'node:net';
+import type { AddressInfo } from 'node:net';
+import { assertPortFree, startServer } from '../src/index.ts';
 import { GAME_VERSION } from '../src/version.ts';
 
 // getMap을 가로채 맵 검증 실패를 흉내 낸다. 평소에는 원본을 그대로 돌려준다.
@@ -115,3 +117,26 @@ describe('startServer', () => {
     expect(err!.message).toContain(`Invalid map ${MAP_IDS[0]}`);
   });
 });
+
+describe('assertPortFree', () => {
+  it('비어 있는 포트면 통과하고 포트를 다시 놓아 준다', async () => {
+    const probe = createServer();
+    await new Promise<void>((r) => probe.listen(0, r));
+    const port = (probe.address() as AddressInfo).port;
+    await new Promise<void>((r) => probe.close(() => r()));
+    await expect(assertPortFree(port)).resolves.toBeUndefined();
+    await expect(assertPortFree(port)).resolves.toBeUndefined(); // 놓아 줬으므로 다시 검사해도 통과
+  });
+
+  it('이미 쓰이는 포트면 EADDRINUSE로 거부한다(서버가 멈춰 있지 않고 끝날 수 있게)', async () => {
+    const holder = createServer();
+    await new Promise<void>((r) => holder.listen(0, r));
+    const port = (holder.address() as AddressInfo).port;
+    try {
+      await expect(assertPortFree(port)).rejects.toMatchObject({ code: 'EADDRINUSE' });
+    } finally {
+      await new Promise<void>((r) => holder.close(() => r()));
+    }
+  });
+});
+

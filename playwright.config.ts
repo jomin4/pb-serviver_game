@@ -16,6 +16,9 @@ export default defineConfig({
     // 이미 떠 있는 서버를 재사용한다. 최신 빌드를 테스트하려면 먼저 `npm run serve`를 종료한다.
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // 끝낼 때 SIGTERM을 보내 serve.mjs가 서버 프로세스 그룹(detached)까지 정리하게 한다.
+    // 기본값(바로 SIGKILL)이면 serve.mjs가 정리하지 못해 서버가 고아로 남고 Playwright도 종료를 기다리며 멈춘다.
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
   },
   use: {
     baseURL: 'http://localhost:2567',
