@@ -109,3 +109,17 @@ export const carMap: MapData = {
   stairs: [],
   zones: [],
 };
+
+/**
+ * open20에 B1 세로 벽(x=10, y=6..14)을 세운 맵. 벽 양쪽은 y<6 또는 y>14로 돌아갈 수 있다.
+ * 같은 높이(y=10.5)에서 벽 양쪽에 선 두 점은 거리가 가까워도 서로 보이지 않는다.
+ * 순찰 경로(B1)는 벽 왼쪽 (3.5,3.5) ↔ (8.5,3.5) 두 점이다. B2는 open20과 같다.
+ */
+export const open20Wall: MapData = (() => {
+  const m = cloneMap(open20);
+  const rows = m.floors[0].rows.map((r, y) => (y >= 6 && y <= 14 ? `${r.slice(0, 10)}#${r.slice(11)}` : r));
+  m.id = 'open20-wall';
+  m.floors[0] = { ...m.floors[0], rows };
+  m.patrolRoutes[0] = { floor: 0, points: [{ x: 3.5, y: 3.5 }, { x: 8.5, y: 3.5 }] };
+  return m;
+})();
