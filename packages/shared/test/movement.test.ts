@@ -99,6 +99,7 @@ describe('applyPlayerMovement', () => {
   it('스태미나는 0과 최대치 사이로 제한된다', () => {
     const drained = applyPlayerMovement(open20, { ...p0, stamina: 0.2 }, runRight, {}, 1);
     expect(drained.stamina).toBe(0);
+    expect(drained.exhausted).toBe(true);
     const full = applyPlayerMovement(open20, p0, makeInput(), {}, 10);
     expect(full.stamina).toBe(CONFIG.player.staminaMax);
   });
@@ -121,6 +122,52 @@ describe('applyPlayerMovement', () => {
   it('이동 입력이 없으면 위치가 그대로다', () => {
     const p = applyPlayerMovement(open20, p0, makeInput(), {}, 1);
     expect(p.pos).toEqual(p0.pos);
+  });
+});
+
+describe('탈진(exhausted)', () => {
+  const dt = 0.05;
+  const tick = (p: ReturnType<typeof makePlayer>) => applyPlayerMovement(open20, p, runRight, {}, dt);
+
+  it('뛰다가 스태미나가 0이 되면 exhausted가 된다', () => {
+    let p = makePlayer({ pos: { x: 2.5, y: 10.5 }, stamina: 0.1 });
+    p = tick(p);
+    expect(p.stamina).toBeCloseTo(0.05);
+    expect(p.exhausted).toBe(false);
+    p = tick(p);
+    expect(p.stamina).toBeCloseTo(0);
+    expect(p.exhausted).toBe(true);
+  });
+  it('스태미나 0에서 뛰기를 누르고 있어도 회복될 때까지 걷기 속도로 균일하게 움직인다(교대 없음)', () => {
+    let p = makePlayer({ pos: { x: 2.5, y: 10.5 }, stamina: 0 });
+    const startX = p.pos.x;
+    let ticks = 0;
+    while (ticks < 40) {
+      const before = p;
+      p = tick(p);
+      ticks++;
+      if (!p.exhausted) break;
+      // 탈진 중에는 매 틱 정확히 걷기 거리만 간다
+      expect(p.pos.x - before.pos.x).toBeCloseTo(CONFIG.player.walkSpeed * dt);
+    }
+    expect(p.exhausted).toBe(false);
+    expect(p.stamina).toBeGreaterThanOrEqual(CONFIG.player.staminaRecoverToRun - 1e-9);
+    // staminaRecoverToRun(1)까지 회복하는 1초 동안 걸은 거리 = 3타일
+    expect(p.pos.x - startX).toBeCloseTo(CONFIG.player.walkSpeed * 1, 1);
+  });
+  it('회복 기준 이상이 되면 다시 뛴다', () => {
+    let p = makePlayer({ pos: { x: 2.5, y: 10.5 }, stamina: 0 });
+    for (let i = 0; i < 40 && (i === 0 || p.exhausted); i++) p = tick(p);
+    expect(p.exhausted).toBe(false);
+    const before = p;
+    p = tick(p);
+    expect(p.pos.x - before.pos.x).toBeCloseTo(CONFIG.player.runSpeed * dt);
+    expect(p.stamina).toBeLessThan(before.stamina);
+  });
+  it('탈진 중 stamina가 recover 미만이면 멈춰도 exhausted가 유지된다', () => {
+    const p = applyPlayerMovement(open20, makePlayer({ stamina: 0, exhausted: true }), makeInput(), {}, 0.5);
+    expect(p.stamina).toBeCloseTo(0.5);
+    expect(p.exhausted).toBe(true);
   });
 });
 

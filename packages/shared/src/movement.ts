@@ -94,7 +94,10 @@ export function applyStairs(map: MapData, p: PlayerState): PlayerState {
 
 /**
  * 한 틱 동안의 플레이어 이동. 새 PlayerState를 돌려주며 입력은 변경하지 않는다.
- * - 뛰기: `input.run`이고 `move`가 영벡터가 아니며 stamina > 0일 때. dt 도중 스태미나가 0이 되어도
+ * - 탈진: 뛰다가 스태미나가 0이 되면 `exhausted = true`. 탈진 중(또는 스태미나가 0인 채 시작)에는 뛰지 못하고
+ *   걷기 속도로 움직이며 스태미나가 회복된다. 스태미나가 `staminaRecoverToRun` 이상이 되면 탈진이 풀린다.
+ *   (뛰기 키를 누른 채 0 근처에서 걷기/뛰기가 틱마다 교대하는 악용을 막는다.)
+ * - 뛰기: `input.run`이고 `move`가 영벡터가 아니며 탈진 상태가 아닐 때. dt 도중 스태미나가 0이 되어도
  *   그 dt 전체를 뛴 것으로 본다(단순화; 다음 틱부터 못 뛴다).
  * - 스태미나는 뛰면 초당 `staminaDrain` 감소, 아니면 초당 `staminaRegen` 회복하며 [0, staminaMax]로 제한한다.
  * - 이동량 = `input.move`(길이 ≤ 1, 그대로 사용) × 속도 × dt, 충돌은 `moveCircle`.
@@ -106,15 +109,17 @@ export function applyPlayerMovement(
   items: Record<string, ItemState>,
   dt: number,
 ): PlayerState {
-  const { radius, staminaMax, staminaDrain, staminaRegen } = CONFIG.player;
+  const { radius, staminaMax, staminaDrain, staminaRegen, staminaRecoverToRun } = CONFIG.player;
   const moving = input.move.x !== 0 || input.move.y !== 0;
-  const running = input.run && moving && p.stamina > 0;
+  const wasExhausted = (p.exhausted && p.stamina < staminaRecoverToRun) || p.stamina <= 0;
+  const running = input.run && moving && !wasExhausted;
   const stamina = running
     ? Math.max(0, p.stamina - staminaDrain * dt)
     : Math.min(staminaMax, p.stamina + staminaRegen * dt);
+  const exhausted = (wasExhausted || stamina <= 0) && stamina < staminaRecoverToRun;
   const speed = playerSpeed(p, items, running);
   const pos = moveCircle(map, p.floor, p.pos, { x: input.move.x * speed * dt, y: input.move.y * speed * dt }, radius);
-  return applyStairs(map, { ...p, pos, stamina });
+  return applyStairs(map, { ...p, pos, stamina, exhausted });
 }
 
 /**

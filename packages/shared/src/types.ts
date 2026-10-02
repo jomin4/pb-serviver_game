@@ -20,7 +20,9 @@ export type PlayerState = {
   alive: boolean;                                  // false면 유령
   inventory: string[];                             // item id, 최대 3
   selectedSlot: 0 | 1 | 2; lastSeq: number; interactHeld: number; // 초
-  prevInteract: boolean; onStairs: boolean; connected: boolean;
+  prevInteract: boolean; onStairs: boolean;
+  exhausted: boolean;                              // 스태미나가 바닥나 회복될 때까지 뛰지 못함
+  connected: boolean;
   cooldowns: { flicker: number; ping: number; chat: number };
   carriedTotal: number;                            // 결과 화면용 운반 누계
 };

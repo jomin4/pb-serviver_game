@@ -20,6 +20,7 @@ export function makePlayer(partial: Partial<PlayerState> = {}): PlayerState {
     interactHeld: 0,
     prevInteract: false,
     onStairs: false,
+    exhausted: false,
     connected: true,
     cooldowns: { flicker: 0, ping: 0, chat: 0 },
     carriedTotal: 0,

@@ -16,6 +16,7 @@ export const CONFIG = {
     staminaMax: 5,
     staminaDrain: 1,
     staminaRegen: 1,
+    staminaRecoverToRun: 1,
     hp: 2,
     ambientRadius: 1.5,
     slots: 3,
