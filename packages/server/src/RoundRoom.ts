@@ -15,7 +15,6 @@ export type JoinOptions = { name: string; version: string };
  */
 export type RoundRoomOptions = { reconnectSeconds?: number; stepFn?: typeof step };
 
-const TICK_MS = 50;
 const MAP_ID = 'parking-lot';
 export const ROUND_ERROR_MESSAGE = '오류로 라운드가 종료되었습니다';
 
@@ -118,8 +117,8 @@ export class RoundRoom extends Room<{ state: RoomState }> {
     this.state.phase = 'playing';
     this.state.result = '';
     syncSchema(this.world, this.state);
-    this.setPatchRate(TICK_MS);
-    this.setTimestep((deltaMs) => this.tick(deltaMs), TICK_MS);
+    this.setPatchRate(CONFIG.patchMs);
+    this.setTimestep((deltaMs) => this.tick(deltaMs), CONFIG.tickMs);
     console.info({ event: 'roundStarted', roomId: this.roomId, seed, players: players.map((p) => p.name) });
   }
 
@@ -137,7 +136,12 @@ export class RoundRoom extends Room<{ state: RoomState }> {
       if (this.world.round.phase !== 'playing') this.finishRound(this.world);
     } catch (err) {
       console.error({ roomId: this.roomId, tick: world.tick, seed: world.seed, err });
-      this.abortRound();
+      try {
+        this.abortRound();
+      } catch (abortErr) {
+        // 마지막 방어선: 인터벌 밖으로 아무것도 새어 나가지 않게 한다.
+        console.error({ roomId: this.roomId, tick: world.tick, seed: world.seed, err: abortErr });
+      }
     }
   }
 
@@ -212,8 +216,9 @@ export class RoundRoom extends Room<{ state: RoomState }> {
 
   /** 끊김. 진행 중이면 재접속을 기다린다. 그 밖의 단계는 기다리지 않는다(이어서 onLeave가 불린다). */
   async onDrop(client: any): Promise<void> {
-    if (this.state.phase !== 'playing' || !this.world) return;
     const id: string = client.sessionId;
+    // 현재 멤버가 아니면(이미 빠진 사람) 재접속 자리를 주지 않는다.
+    if (this.state.phase !== 'playing' || !this.world?.players[id] || !this.state.players.has(id)) return;
     this.setConnected(id, false);
     try {
       await this.allowReconnection(client, this.reconnectSeconds);
@@ -221,8 +226,9 @@ export class RoundRoom extends Room<{ state: RoomState }> {
       this.killDisconnected(id); // 유예 초과. 이어서 onLeave가 불린다.
       return;
     }
-    if (this.state.players.has(id) && this.state.phase === 'playing') this.setConnected(id, true);
-    else client.leave(); // 기다리는 사이 라운드가 끝나 멤버에서 빠졌다.
+    // 유예 안에 돌아오면 단계와 상관없이 복귀한다(기다리는 사이 라운드가 끝났어도 결과 화면에 남는다).
+    if (this.state.players.has(id)) this.setConnected(id, true);
+    else client.leave(); // 기다리는 사이 오류로 대기실에 돌아가며 멤버에서 빠졌다.
   }
 
   onLeave(client: any): void {

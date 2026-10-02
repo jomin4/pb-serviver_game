@@ -165,6 +165,30 @@ describe('RoundRoom 게임 루프', () => {
     await waitFor(() => room.state.players.get(id)!.lastSeq === 1);
   });
 
+  it('끊긴 사이 라운드가 끝나도 유예 안에 재접속하면 결과 화면에 남고 again에 참여한다', async () => {
+    const { room, host, others } = await started(1);
+    const guest = others[0]!;
+    const id = guest.sessionId;
+    const token = guest.reconnectionToken;
+    drop(guest);
+    await waitFor(() => room.state.players.get(id)!.connected === false);
+    worldOf(room).round.clock = CONFIG.roundEndClock;
+    await waitFor(() => room.state.phase === 'result');
+    expect(room.state.players.has(id)).toBe(true);
+
+    const back = await colyseus.sdk.reconnect(token);
+    expect(back.sessionId).toBe(id);
+    await waitFor(() => room.state.players.get(id)!.connected === true);
+    expect(room.state.players.has(id)).toBe(true);
+    await sleep(1300); // 유예가 지나도 쫓겨나지 않는다
+    expect(room.state.players.get(id)!.connected).toBe(true);
+    expect(room.state.phase).toBe('result');
+
+    host.send('again');
+    await waitFor(() => room.state.phase === 'lobby');
+    expect([...room.state.players.keys()].sort()).toEqual([host.sessionId, id].sort());
+  });
+
   it('재접속하지 않으면 유예 후 사망 처리(소지품 낙하, 사망 이벤트)', async () => {
     const { room, host, others, events } = await started(1);
     const guest = others[0]!;
