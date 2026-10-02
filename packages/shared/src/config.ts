@@ -63,6 +63,28 @@ export const CONFIG = {
     quickChats: ['여기로', '도와줘!', '폐품 있음', '도망쳐!', '비춰줘!', '트럭으로'],
   },
   net: { maxMessagesPerSecond: 60, maxInputsPerBatch: 10, maxDt: 0.1, nicknameMax: 10, roomCodeLength: 6, interpolationMs: 100 },
-  fx: { dangerDistance: 5 },
+  /** 화면 기준 해상도(px)와 1타일의 기준 px(스펙 4.1). */
+  view: { width: 960, height: 540, tilePx: 32 },
+  fx: {
+    dangerDistance: 5,
+    /** 어둠 레이어 불투명도: 생존자 / 유령(스펙 4.3). */
+    darknessAlpha: 0.95,
+    ghostDarknessAlpha: 0.6,
+    /** 깜빡이는 조명의 점멸 빈도: Math.floor(t * flickerBlinkHz) % 2일 때 켜짐. */
+    flickerBlinkHz: 12,
+    /** 트럭 구역(출입구) 주변의 넓은 빛 반경(타일). */
+    truckLightRadius: 6,
+    /** 빛 가장자리 흐림: 반경 대비 이 비율부터 어두워진다. */
+    lightSoftEdge: 0.6,
+    /** 화면 밖 광원도 반경 + 여유(타일)가 화면에 닿으면 계산한다. */
+    lightCullMargin: 2,
+    shakeSeconds: 0.3,
+    shakeTiles: 0.18,
+    /** 유령끼리 보일 때의 불투명도. */
+    ghostAlpha: 0.45,
+    chatLogSize: 5,
+    /** HUD 안내(경적, 사망 등) 표시 시간(초). */
+    noticeSeconds: 4,
+  },
   pathfinding: { stairsCost: 1 },
 } as const;

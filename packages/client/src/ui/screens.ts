@@ -28,11 +28,9 @@ function root(): HTMLElement {
 }
 
 function mount(...nodes: Child[]): void {
-  root().replaceChildren(h('main', { class: 'screen' }, ...nodes));
-}
-
-function mountWide(...nodes: Child[]): void {
-  root().replaceChildren(h('main', { class: 'screen wide' }, ...nodes));
+  const r = root();
+  r.classList.remove('playing');
+  r.replaceChildren(h('main', { class: 'screen' }, ...nodes));
 }
 
 const NICKNAME_HINT = '닉네임은 1~10자로 입력해 주세요';
@@ -213,12 +211,23 @@ export function showResult(state: RoomView, onAgain: () => void): void {
   );
 }
 
-/** 게임 화면 자리표시. 렌더링과 입력은 Task 18에서 이 함수를 대체한다. */
-export function showGamePlaceholder(): void {
-  mountWide(
-    h('canvas', { width: '960', height: '540', class: 'game-canvas', testid: 'game-canvas' }),
-    h('p', { class: 'hint', testid: 'game-placeholder' }, '게임 화면 (Task 18)'),
-  );
+export type GameElements = {
+  /** 캔버스와 HUD를 겹쳐 담는 상자. 크기는 게임 쪽이 카메라에 맞춰 정한다. */
+  stage: HTMLElement;
+  canvas: HTMLCanvasElement;
+  /** HUD를 붙일 자리(캔버스 위에 겹친다). */
+  hudHost: HTMLElement;
+};
+
+/** 게임 화면: 창 전체를 쓰는 검은 바탕 가운데에 캔버스와 HUD 층. 그리기와 입력은 game.ts가 맡는다. */
+export function showGame(): GameElements {
+  const canvas = h('canvas', { class: 'game-canvas', testid: 'game-canvas', tabindex: '-1' });
+  const hudHost = h('div', { class: 'hud-host' });
+  const stage = h('div', { class: 'game-stage', testid: 'game-stage' }, canvas, hudHost);
+  const r = root();
+  r.classList.add('playing');
+  r.replaceChildren(h('main', { class: 'game', testid: 'game-screen' }, stage));
+  return { stage, canvas, hudHost };
 }
 
 export function showError(message: string, onRetry?: () => void, actionLabel = '다시 시도'): void {
