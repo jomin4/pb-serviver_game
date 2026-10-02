@@ -62,7 +62,7 @@ export const CONFIG = {
     chatCooldown: 1,
     quickChats: ['여기로', '도와줘!', '폐품 있음', '도망쳐!', '비춰줘!', '트럭으로'],
   },
-  net: { maxMessagesPerSecond: 60, maxDt: 0.1, nicknameMax: 10, interpolationMs: 100 },
+  net: { maxMessagesPerSecond: 60, maxInputsPerBatch: 10, maxDt: 0.1, nicknameMax: 10, interpolationMs: 100 },
   fx: { dangerDistance: 5 },
   pathfinding: { stairsCost: 1 },
 } as const;
