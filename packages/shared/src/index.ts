@@ -8,3 +8,5 @@ export { validateMap } from './map/validate.ts';
 export { getMap, MAP_IDS } from './map/index.ts';
 export type { FloorData, MapData, Rect, TileKind } from './map/index.ts';
 export { findPath, pathLength } from './pathfinding.ts';
+export { hasLineOfSight, inFlashlight, visibilityPolygon, wallSegments } from './vision.ts';
+export type { Segment } from './vision.ts';

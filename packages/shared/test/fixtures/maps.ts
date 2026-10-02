@@ -45,3 +45,48 @@ export const at = (floor: FloorId, tx: number, ty: number): { floor: FloorId; po
   floor,
   pos: { x: tx + 0.5, y: ty + 0.5 },
 });
+
+const ring = (w: number, h: number): string[] =>
+  Array.from({ length: h }, (_, y) => (y === 0 || y === h - 1 ? '#'.repeat(w) : `#${'.'.repeat(w - 2)}#`));
+
+const noStairs = { stairs: [] as MapData['stairs'] };
+
+/**
+ * 시야 테스트용 20×20 열린 방(두 층). 가장자리만 벽이다. 반경 8 안에 벽이 없는 지점이 많아
+ * 사거리·가시 다각형이 원에 가까워지는지 확인하기 좋다.
+ */
+export const open20: MapData = {
+  id: 'open20',
+  floors: [
+    { width: 20, height: 20, rows: ring(20, 20) },
+    { width: 20, height: 20, rows: ring(20, 20) },
+  ],
+  truckZone: { x: 1, y: 1, w: 3, h: 2 },
+  spawns: [{ x: 1.5, y: 1.5 }, { x: 2.5, y: 1.5 }, { x: 1.5, y: 2.5 }, { x: 2.5, y: 2.5 }],
+  itemSlots: [],
+  patrolRoutes: [{ floor: 0, points: [{ x: 5.5, y: 5.5 }] }, { floor: 1, points: [{ x: 5.5, y: 5.5 }] }],
+  lights: [],
+  ...noStairs,
+  zones: [],
+};
+
+/**
+ * `wallSegments` 테스트용 맵. B1(층 0)은 8×5 열린 바닥에 2×1 단단한 블록 하나((3,2), (4,2))만 있다.
+ * 맵 가장자리에는 벽을 두지 않는다. `wallSegments`는 "범위 밖 = 벽"으로 보지만 범위 안의 단단한 칸과
+ * 범위 안의 비단단 칸 사이 변만 내보내므로 맵 경계는 선분을 만들지 않는다. 따라서 결과는 블록 외곽 4개다.
+ * B2(층 1)는 단단한 칸이 없다.
+ */
+export const solid2x1: MapData = {
+  id: 'solid2x1',
+  floors: [
+    { width: 8, height: 5, rows: ['........', '........', '...##...', '........', '........'] },
+    { width: 8, height: 5, rows: ['........', '........', '........', '........', '........'] },
+  ],
+  truckZone: { x: 0, y: 0, w: 2, h: 2 },
+  spawns: [{ x: 0.5, y: 0.5 }, { x: 1.5, y: 0.5 }, { x: 0.5, y: 1.5 }, { x: 1.5, y: 1.5 }],
+  itemSlots: [],
+  patrolRoutes: [{ floor: 0, points: [{ x: 0.5, y: 4.5 }] }, { floor: 1, points: [{ x: 0.5, y: 4.5 }] }],
+  lights: [],
+  ...noStairs,
+  zones: [],
+};
