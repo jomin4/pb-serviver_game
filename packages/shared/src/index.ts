@@ -1,3 +1,9 @@
 export { CONFIG } from './config.ts';
 export { createRng, rngFromState } from './rng.ts';
 export type { Rng } from './rng.ts';
+export type * from './types.ts';
+export * from './geometry.ts';
+export { bfsDistances, isSolid, isWalkableTile, stairsAt, tileAt } from './map/grid.ts';
+export { validateMap } from './map/validate.ts';
+export { getMap, MAP_IDS } from './map/index.ts';
+export type { FloorData, MapData, Rect, TileKind } from './map/index.ts';
