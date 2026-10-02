@@ -61,4 +61,5 @@ export const CONFIG = {
   },
   net: { maxMessagesPerSecond: 60, maxDt: 0.1, nicknameMax: 10, interpolationMs: 100 },
   fx: { dangerDistance: 5 },
+  pathfinding: { stairsCost: 1 },
 } as const;
