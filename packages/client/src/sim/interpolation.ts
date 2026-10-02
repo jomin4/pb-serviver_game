@@ -1,7 +1,8 @@
-import { CONFIG } from '@bh/shared';
+import { angleDiff, CONFIG } from '@bh/shared';
 import type { FloorId, Vec } from '@bh/shared';
 
-export type EntityPose = { pos: Vec; floor: FloorId };
+/** `aim`(라디안)은 조준 방향이 있는 엔티티(플레이어)만 넣는다. */
+export type EntityPose = { pos: Vec; floor: FloorId; aim?: number };
 export type Snapshot = Record<string, EntityPose>;
 
 export type Interpolator = {
@@ -14,12 +15,25 @@ const MAX_GAP_MS = 1000;
 
 type Entry = { t: number; snap: Snapshot };
 
-const copy = (e: EntityPose): EntityPose => ({ pos: { x: e.pos.x, y: e.pos.y }, floor: e.floor });
+const copy = (e: EntityPose): EntityPose =>
+  e.aim === undefined ? { pos: { x: e.pos.x, y: e.pos.y }, floor: e.floor } : { pos: { x: e.pos.x, y: e.pos.y }, floor: e.floor, aim: e.aim };
+
+/** 각도 a → b를 짧은 호로 k만큼 보간한다. 결과는 (−π, π]. */
+function lerpAngle(a: number, b: number, k: number): number {
+  const r = angleDiff(a + angleDiff(b, a) * k, 0); // [−π, π)
+  return r === -Math.PI ? Math.PI : r;
+}
+
+function lerpPose(prev: EntityPose, next: EntityPose, k: number): EntityPose {
+  const pos = { x: prev.pos.x + (next.pos.x - prev.pos.x) * k, y: prev.pos.y + (next.pos.y - prev.pos.y) * k };
+  if (next.aim === undefined) return { pos, floor: next.floor };
+  return { pos, floor: next.floor, aim: prev.aim === undefined ? next.aim : lerpAngle(prev.aim, next.aim, k) };
+}
 const copyAll = (s: Snapshot): Snapshot => Object.fromEntries(Object.entries(s).map(([id, e]) => [id, copy(e)]));
 
 /**
  * 다른 엔티티를 `delayMs`만큼 늦춰 그리기 위한 스냅숏 보간기(스펙 3.3).
- * `sample(nowMs)`는 렌더 시각 `nowMs - delayMs`를 감싸는 두 스냅숏 사이를 엔티티별로 선형 보간한다.
+ * `sample(nowMs)`는 렌더 시각 `nowMs - delayMs`를 감싸는 두 스냅숏 사이를 엔티티별로 선형 보간한다(조준 `aim`은 짧은 호로).
  * 층이 바뀐 엔티티, 이전 스냅숏에 없던 엔티티, 두 스냅숏이 `MAX_GAP_MS` 이상 벌어진 경우에는 보간하지 않고
  * 더 새로운 쪽 값을 쓴다. 렌더 시각이 가장 최신 스냅숏보다 뒤이면 외삽하지 않고 최신 값을 쓴다.
  * 새 스냅숏이 직전 것보다 `MAX_GAP_MS` 이상 늦으면 이전 기록을 버려 즉시 최신 상태로 맞춘다.
@@ -54,9 +68,7 @@ export function createInterpolator(delayMs: number = CONFIG.net.interpolationMs)
       const out: Snapshot = {};
       for (const [id, next] of Object.entries(b.snap)) {
         const prev = a.snap[id];
-        out[id] = smooth && prev && prev.floor === next.floor
-          ? { pos: { x: prev.pos.x + (next.pos.x - prev.pos.x) * k, y: prev.pos.y + (next.pos.y - prev.pos.y) * k }, floor: next.floor }
-          : copy(next);
+        out[id] = smooth && prev && prev.floor === next.floor ? lerpPose(prev, next, k) : copy(next);
       }
       return out;
     },

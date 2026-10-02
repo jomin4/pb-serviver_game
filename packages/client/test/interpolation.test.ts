@@ -103,4 +103,44 @@ describe('interpolator', () => {
     ip.push(1050, { a: at(999) });
     expect(ip.sample(1150).a!.pos.x).toBeCloseTo(5);
   });
+
+  describe('조준(aim) 보간', () => {
+    const aimed = (x: number, aim: number) => ({ pos: { x, y: 0 }, floor: 0 as const, aim });
+
+    it('aim도 선형 보간한다', () => {
+      const ip = createInterpolator(100);
+      ip.push(1000, { a: aimed(0, 0) });
+      ip.push(1100, { a: aimed(10, 1) });
+      expect(ip.sample(1150).a!.aim).toBeCloseTo(0.5, 10);
+    });
+
+    it('±π 경계를 넘을 때는 짧은 호로 돈다', () => {
+      const ip = createInterpolator(100);
+      ip.push(1000, { a: aimed(0, Math.PI - 0.1) });
+      ip.push(1100, { a: aimed(0, -Math.PI + 0.1) });
+      // 중간은 0 근처(긴 호)가 아니라 π 근처(짧은 호)
+      const mid = ip.sample(1150).a!.aim!;
+      expect(Math.abs(Math.abs(mid) - Math.PI)).toBeLessThan(1e-9);
+      // 1/4 지점: π - 0.05
+      expect(ip.sample(1125).a!.aim!).toBeCloseTo(Math.PI - 0.05, 10);
+      // 3/4 지점: -π + 0.05 (범위 (−π, π] 안으로 감싼다)
+      expect(ip.sample(1175).a!.aim!).toBeCloseTo(-Math.PI + 0.05, 10);
+    });
+
+    it('aim이 없는 엔티티(몬스터)는 aim 없이 위치만 보간한다', () => {
+      const ip = createInterpolator(100);
+      ip.push(1000, { m: at(0) });
+      ip.push(1100, { m: at(10) });
+      const s = ip.sample(1150);
+      expect(s.m!.pos.x).toBeCloseTo(5);
+      expect(s.m!.aim).toBeUndefined();
+    });
+
+    it('보간하지 않는 경우(층 변경)에는 새 aim을 그대로 쓴다', () => {
+      const ip = createInterpolator(100);
+      ip.push(1000, { a: { pos: { x: 0, y: 0 }, floor: 0, aim: 0 } });
+      ip.push(1100, { a: { pos: { x: 0, y: 0 }, floor: 1, aim: 2 } });
+      expect(ip.sample(1150).a!.aim).toBe(2);
+    });
+  });
 });

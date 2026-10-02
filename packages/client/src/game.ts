@@ -179,7 +179,7 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
     }
 
     const snap: Snapshot = {};
-    for (const p of players) snap[p.id] = { pos: p.pos, floor: p.floor };
+    for (const p of players) snap[p.id] = { pos: p.pos, floor: p.floor, aim: p.aim };
     for (const m of monsters) snap[MONSTER_KEY(m.id)] = { pos: m.pos, floor: m.floor };
     interpolator.push(t, snap);
 
@@ -247,7 +247,7 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
     pings = pings.filter((p) => p.until > time);
     const others = players.filter((p) => p.id !== selfId).map((p) => {
       const pose = sampled[p.id];
-      return pose ? { ...p, pos: pose.pos, floor: pose.floor } : p;
+      return pose ? { ...p, pos: pose.pos, floor: pose.floor, aim: pose.aim ?? p.aim } : p;
     });
     const snap: RenderSnapshot = {
       selfId,
