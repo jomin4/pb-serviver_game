@@ -12,3 +12,4 @@ export { hasLineOfSight, inFlashlight, visibilityPolygon, wallSegments } from '.
 export type { Segment } from './vision.ts';
 export { applyPlayerMovement, applyStairs, moveCircle, playerSpeed, unstick } from './movement.ts';
 export { EMPTY_INPUT, sanitizeBatch, sanitizeInput } from './input.ts';
+export { ITEM_KINDS, dropAll, dropSelected, itemCountFor, loadIntoTruck, nearestPickable, pickUp, spawnItems } from './items.ts';

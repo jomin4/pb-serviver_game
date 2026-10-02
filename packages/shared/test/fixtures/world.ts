@@ -1,5 +1,5 @@
 import { CONFIG } from '../../src/config.ts';
-import type { ItemState, PlayerInput, PlayerState } from '../../src/types.ts';
+import type { ItemState, PlayerInput, PlayerState, World } from '../../src/types.ts';
 
 /** 테스트용 PlayerState. 기본값은 B1 (1.5, 1.5)에 선 살아 있는 플레이어. */
 export function makePlayer(partial: Partial<PlayerState> = {}): PlayerState {
@@ -49,4 +49,25 @@ export function makeInput(partial: Partial<PlayerInput> = {}): PlayerInput {
 /** 테스트용 ItemState. */
 export function makeItem(id: string, weight: number, partial: Partial<ItemState> = {}): ItemState {
   return { id, kind: 'scrap', value: 10, weight, pos: { x: 0, y: 0 }, floor: 0, carriedBy: null, loaded: false, ...partial };
+}
+
+/** 테스트용 World. 플레이어 수는 players 개수로 정한다. createWorld가 생기기 전까지 쓰는 손수 만든 월드. */
+export function makeWorld(partial: Partial<World> = {}): World {
+  const players = partial.players ?? {};
+  return {
+    tick: 0,
+    time: 0,
+    seed: 1,
+    rngState: 1,
+    mapId: 'parking-lot',
+    playerCount: Object.keys(players).length,
+    players,
+    items: {},
+    stalkers: [],
+    watcher: { id: 'watcher', floor: 0, pos: { x: 0, y: 0 }, active: false, frozen: false, moving: false, path: [], waitTimer: 0 },
+    lights: [],
+    round: { clock: 0, target: 250, truckTotal: 0, phase: 'playing', watcherSpawned: false, lightsHalved: false, horned: false },
+    events: [],
+    ...partial,
+  };
 }
