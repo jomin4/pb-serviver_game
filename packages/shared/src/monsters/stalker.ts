@@ -177,19 +177,40 @@ function move(world: World, map: MapData, s: StalkerState, dt: number): void {
   if (!s.goal) return;
 
   const last = s.path[s.path.length - 1];
-  if (!last || dist(last, s.goal) >= REPATH_DISTANCE) repath(map, s, s.goal);
+  if ((!last || dist(last, s.goal) >= REPATH_DISTANCE) && !repath(map, s, s.goal)) {
+    if (s.mode === 'investigate' || s.mode === 'search') {
+      // 도달할 수 없는 목표(계단 칸, 단단한 칸 등)에 매달려 멈춰 있지 않고 배회로 돌아간다.
+      setMode(s, 'patrol');
+      s.goal = null;
+      s.timer = 0;
+      move(world, map, s, dt);
+      return;
+    }
+    // 추격: 경로가 없어도 멈추지 않고 목표로 곧장 간다(벽은 moveCircle이 막는다). 목표 하나짜리 경로를
+    // 남겨 두면 목표가 1타일 이상 움직이기 전에는 A*를 다시 돌리지 않는다. 대상이 안 보이면
+    // 평소처럼 놓친 시간이 쌓여 수색으로 넘어간다.
+    if (s.mode === 'chase') s.path = [copy(s.goal)];
+  }
   followPath(map, s, s.goal, speed * dt);
 }
 
-/** 같은 층 경로만 쓴다. 계단을 타야 하는 경로는 계단 직전에서 자른다(추적형은 배치된 층에 머문다). */
-function repath(map: MapData, s: StalkerState, goal: Vec): void {
-  const path = findPath(map, { floor: s.floor, pos: s.pos }, { floor: s.floor, pos: goal }) ?? [];
+/**
+ * 같은 층 경로만 쓴다(추적형은 배치된 층에 머문다). 경로를 못 찾거나 계단을 타야만 닿으면
+ * (목표가 계단·단단한 칸이거나 끊긴 구역) false를 돌려준다. 그때 `path`는 계단 직전까지 자른 앞부분이다.
+ */
+function repath(map: MapData, s: StalkerState, goal: Vec): boolean {
+  const path = findPath(map, { floor: s.floor, pos: s.pos }, { floor: s.floor, pos: goal });
   const nodes: Vec[] = [];
-  for (const n of path) {
-    if (n.floor !== s.floor) break;
+  let reachable = path !== null;
+  for (const n of path ?? []) {
+    if (n.floor !== s.floor) {
+      reachable = false; // 계단을 거쳐야만 닿는 목표(계단 칸 자체 포함)는 도달 불가로 본다
+      break;
+    }
     nodes.push(n.pos);
   }
   s.path = nodes;
+  return reachable;
 }
 
 const sameTile = (a: Vec, b: Vec): boolean => Math.floor(a.x) === Math.floor(b.x) && Math.floor(a.y) === Math.floor(b.y);

@@ -5,6 +5,7 @@ import { emitNoise } from '../src/noise.ts';
 import { startRetreat, stalkerContacts, updateStalker } from '../src/monsters/stalker.ts';
 import type { MapData } from '../src/map/types.ts';
 import type { FloorId, StalkerState, Vec, World } from '../src/types.ts';
+import { getMap } from '../src/map/index.ts';
 import { open20, open20Wall } from './fixtures/maps.ts';
 import { makePlayer, makeWorld } from './fixtures/world.ts';
 
@@ -359,5 +360,62 @@ describe('stalker 순수성', () => {
     updateStalker(w, open20, mkStalker(), DT);
     expect(w).toEqual(before);
     expect(open20).toEqual(mapBefore);
+  });
+});
+
+describe('stalker 도달 불가능한 목표', () => {
+  const parking = getMap('parking-lot');
+  const far = { pos: { x: 1.5, y: 1.5 } }; // 멀리 떨어진 플레이어
+
+  const settle = (w: World, s: StalkerState, ticks: number): void => {
+    for (let i = 0; i < ticks; i++) {
+      w.events = [];
+      updateStalker(w, parking, s, DT);
+    }
+  };
+
+  it('계단 칸에서 난 소리는 조사하지 못하고 몇 틱 안에 배회로 돌아가 계속 움직인다', () => {
+    const w = mkWorld(far);
+    const s = mkStalker({ pos: { x: 33.5, y: 17.5 } });
+    emitNoise(w, 0, { x: 33.5, y: 16.5 }, CONFIG.noise.walk); // (33,16)은 계단 칸
+    updateStalker(w, parking, s, DT);
+    expect(s.mode).toBe('patrol');
+    expect(s.goal).toEqual(parking.patrolRoutes[0]!.points[0]);
+    const start = { ...s.pos };
+    settle(w, s, 20);
+    expect(s.mode).toBe('patrol');
+    expect(dist(s.pos, start)).toBeGreaterThan(2);
+  });
+
+  it('차 칸(단단한 칸) 안에서 난 소리도 배회로 돌아가 계속 움직인다', () => {
+    const w = mkWorld(far);
+    const s = mkStalker({ pos: { x: 12.5, y: 21.5 } });
+    emitNoise(w, 0, { x: 12.5, y: 24.5 }, CONFIG.noise.run); // (12,24)는 차 칸
+    updateStalker(w, parking, s, DT);
+    expect(s.mode).toBe('patrol');
+    const start = { ...s.pos };
+    settle(w, s, 20);
+    expect(s.mode).toBe('patrol');
+    expect(dist(s.pos, start)).toBeGreaterThan(2);
+  });
+
+  it('도달 불가능한 수색 목표는 수색을 접고 배회로 돌아간다', () => {
+    const w = mkWorld(far);
+    const s = mkStalker({ mode: 'search', pos: { x: 12.5, y: 21.5 }, goal: { x: 12.5, y: 24.5 }, timer: 4 });
+    updateStalker(w, parking, s, DT);
+    expect(s.mode).toBe('patrol');
+    expect(s.goal).not.toEqual({ x: 12.5, y: 24.5 });
+  });
+
+  it('계단 칸에 선 대상도 멈추지 않고 곧장 다가가며, 경로 계산은 목표가 1타일 움직일 때만 다시 한다', () => {
+    const w = mkWorld({ pos: { x: 33.5, y: 16.5 } }); // 계단 칸 위
+    const s = mkStalker({ pos: { x: 33.5, y: 18.5 } });
+    updateStalker(w, parking, s, DT);
+    expect(s.mode).toBe('chase');
+    expect(s.pos.y).toBeLessThan(18.5);
+    expect(s.path).toEqual([{ x: 33.5, y: 16.5 }]); // 곧장 가기 표시: 목표 하나짜리 경로
+    settle(w, s, 10);
+    expect(s.mode).toBe('chase');
+    expect(s.pos.y).toBeLessThan(18.5 - 1);
   });
 });
