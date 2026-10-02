@@ -13,6 +13,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run serve',
     url: 'http://localhost:2567',
+    // 이미 떠 있는 서버를 재사용한다. 최신 빌드를 테스트하려면 먼저 `npm run serve`를 종료한다.
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

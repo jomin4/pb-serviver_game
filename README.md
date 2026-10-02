@@ -13,9 +13,14 @@
 ## 설치와 개발
 
 ```bash
+git clone https://github.com/jomin4/pb-serviver_game.git
+cd pb-serviver_game
+git checkout ccr-07fd93bb-obo8mr
 npm install
 npm run dev
 ```
+
+(게임은 아직 `ccr-07fd93bb-obo8mr` 브랜치에만 있다. 이 브랜치가 main에 합쳐지면 `git checkout` 단계는 필요 없다.)
 
 브라우저에서 http://localhost:5173 을 연다. (서버는 2567, Vite 개발 서버는 5173 포트를 쓴다.)
 
@@ -27,10 +32,11 @@ npm run e2e     # Playwright E2E: 두 명이 초대 링크로 모여 플레이
 ```
 
 `npm run e2e`는 클라이언트를 빌드하고 서버를 띄운 뒤(`npm run serve`) 실제 브라우저로 확인한다.
+이미 `npm run serve`가 실행 중이면 그 서버를 재사용하므로, 최신 빌드를 테스트하려면 먼저 종료하고 실행한다.
 스크린샷은 `test-results/`(git에 포함되지 않음)에 저장된다.
 
-- 일반 PC: 처음 한 번만 `npx playwright install chromium` 을 실행한다.
-- Playwright 브라우저를 설치할 수 없는 환경(예: 클라우드 세션): 이미 있는 Chromium 경로를 지정한다.
+- 일반 PC(Windows 포함): 처음 한 번만 `npx playwright install chromium` 을 실행한 뒤 `npm run e2e` 를 실행한다.
+- 클라우드 세션처럼 Playwright 브라우저를 설치할 수 없는 환경에서만, 이미 있는 Chromium 경로를 지정한다. 아래 줄은 그 환경 전용이다.
 
   ```bash
   PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npm run e2e
@@ -46,11 +52,18 @@ npm run e2e     # Playwright E2E: 두 명이 초대 링크로 모여 플레이
 
    http://localhost:2567 에서 직접 확인해 볼 수 있다.
 
-2. 다른 터미널에서 [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)로 공개한다.
+2. `cloudflared`는 별도 프로그램이라 먼저 설치한다.
+   - Windows: `winget install --id Cloudflare.cloudflared` (설치 후 새 터미널을 연다)
+   - macOS: `brew install cloudflared`
+   - 그 밖: [Cloudflare 다운로드 페이지](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+
+   다른 터미널에서 [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)로 공개한다.
 
    ```bash
    cloudflared tunnel --url http://localhost:2567
    ```
+
+   터널 주소는 실행할 때마다 바뀌며, 플레이하는 동안 서버 터미널과 터널 터미널을 모두 열어 두어야 한다.
 
 3. 출력된 `https://....trycloudflare.com` 주소로 접속해 닉네임을 입력하고 "방 만들기"를 누른다.
 4. 대기실의 "링크 복사" 버튼으로 초대 링크를 복사해 친구에게 보낸다. 링크에 `?room=코드`가 이미 들어 있다.
@@ -59,7 +72,7 @@ npm run e2e     # Playwright E2E: 두 명이 초대 링크로 모여 플레이
 
 ## PC Remote Control로 개발 이어가기
 
-개발 중인 저장소 폴더에서 아래 명령을 실행해 두면, 휴대폰 Claude 앱에서 그 세션을 이어서 쓸 수 있다.
+PC에 Claude Code가 설치되어 있고 로그인되어 있어야 한다. 개발 중인 저장소 폴더에서 아래 명령을 실행해 두면, 휴대폰 Claude 앱에서 그 세션을 이어서 쓸 수 있다.
 
 ```bash
 claude remote-control
