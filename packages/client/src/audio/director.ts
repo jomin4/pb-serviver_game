@@ -31,7 +31,8 @@ export function createAudioDirector(audio: AudioSink): AudioDirector {
   const cfg = CONFIG.audio;
   let clock = 0;
   let self: { pos: Vec; floor: FloorId } = { pos: { x: 0, y: 0 }, floor: 0 };
-  let lastNoiseAt = -Infinity;
+  /** 최근에 소리를 낸 뛰는 소음의 근원(동료)별 마지막 위치와 시각. 간격은 근원마다 센다. */
+  let runSources: Array<{ floor: FloorId; pos: Vec; at: number }> = [];
   let lastBuzzAt = -Infinity;
   let heartbeatIn = 0;
   let inventory: number | null = null;
@@ -95,9 +96,16 @@ export function createAudioDirector(audio: AudioSink): AudioDirector {
     },
     onNoise(e) {
       if (e.radius !== CONFIG.noise.run) return;
-      if (e.floor === self.floor && dist(e.pos, self.pos) < cfg.selfNoiseTolerance) return;
-      if (clock - lastNoiseAt < cfg.teammateRunInterval) return;
-      lastNoiseAt = clock;
+      // 서버는 모든 플레이어의 소음을 모두에게 틱마다 보낸다. 들리지 않는 것은 간격 계산에 쓰지 않고 먼저 버린다.
+      if (e.floor !== self.floor || dist(e.pos, self.pos) >= cfg.maxDistance.teammateRun) return;
+      // 내 소음 걸러내기: 소음 이벤트에는 플레이어 id가 없어 위치로 판단한다(내 위치 `selfNoiseTolerance` 안이면 내 것).
+      // 한계: 내 위치는 예측값이라 서버가 소음을 낸 위치와 지연만큼(뛰면 최대 ~0.75타일) 어긋날 수 있고,
+      // 허용 거리 안에서 뛰는 동료의 소리도 함께 버려진다.
+      if (dist(e.pos, self.pos) < cfg.selfNoiseTolerance) return;
+      runSources = runSources.filter((s) => clock - s.at < cfg.teammateRunInterval);
+      // 같은 근원(가까운 위치)이 간격 안에 이미 울렸으면 건너뛴다. 다른 동료는 서로 막지 않는다.
+      if (runSources.some((s) => s.floor === e.floor && dist(s.pos, e.pos) < cfg.teammateRunSourceRadius)) return;
+      runSources.push({ floor: e.floor, pos: { x: e.pos.x, y: e.pos.y }, at: clock });
       audio.play('teammateRun', { pos: e.pos, floor: e.floor });
     },
     onInventory(count) {

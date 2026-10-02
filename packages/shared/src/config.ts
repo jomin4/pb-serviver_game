@@ -105,6 +105,8 @@ export const CONFIG = {
     selfNoiseTolerance: 1.5,
     /** 동료 뛰는 소리 최소 간격(서버는 틱마다 소음을 낸다). */
     teammateRunInterval: 0.25,
+    /** 같은 층에서 이 거리(타일) 안의 뛰는 소음은 같은 동료의 것으로 보고 간격을 함께 센다. */
+    teammateRunSourceRadius: 1.5,
     /** 지직거리는 형광등이 들리는 거리, 그리고 지직 소리 최소 간격. */
     buzzRange: 6,
     buzzMinInterval: 0.08,

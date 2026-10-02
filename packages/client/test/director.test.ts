@@ -157,6 +157,30 @@ describe('audio director', () => {
       d.onNoise(run({ x: 15, y: 10 }));
       expect(audio.plays('teammateRun')).toHaveLength(1);
     });
+    it('다른 층 소음이 같은 틱의 같은 층 소음을 막지 않는다', () => {
+      d.update(snap(), 1);
+      d.onNoise(run({ x: 15, y: 10 }, 1));
+      d.onNoise(run({ x: 15, y: 10 }, 0));
+      expect(audio.plays('teammateRun')).toHaveLength(1);
+      expect((audio.plays('teammateRun')[0]!.args[1] as Located).floor).toBe(0);
+    });
+    it('범위 밖 소음이 범위 안 소음을 막지 않는다', () => {
+      d.update(snap(), 1);
+      d.onNoise(run({ x: 10 + CONFIG.audio.maxDistance.teammateRun + 2, y: 10 }));
+      expect(audio.plays('teammateRun')).toHaveLength(0);
+      d.onNoise(run({ x: 15, y: 10 }));
+      expect(audio.plays('teammateRun')).toHaveLength(1);
+    });
+    it('서로 다른 위치의 동료 둘은 간격 안에서도 둘 다 들린다', () => {
+      d.update(snap(), 1);
+      d.onNoise(run({ x: 15, y: 10 }));
+      d.onNoise(run({ x: 10, y: 17 }));
+      expect(audio.plays('teammateRun')).toHaveLength(2);
+      d.update(snap(), 0.05);
+      d.onNoise(run({ x: 15.3, y: 10 }));
+      d.onNoise(run({ x: 10, y: 17.3 }));
+      expect(audio.plays('teammateRun')).toHaveLength(2);
+    });
     it('틱마다 오는 소음은 최소 간격으로 거른다', () => {
       d.update(snap(), 1);
       d.onNoise(run({ x: 15, y: 10 }));
