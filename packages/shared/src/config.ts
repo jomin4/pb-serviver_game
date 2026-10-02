@@ -26,7 +26,7 @@ export const CONFIG = {
     departHoldSeconds: 3,
   },
   movement: { maxStep: 0.25 },
-  flashlight: { angle: Math.PI / 3, range: 8, batteryMax: 180 },
+  flashlight: { angle: Math.PI / 3, range: 8, batteryMax: 180, drainPerSecond: 1 },
   noise: { walk: 1.5, run: 8, drop: 6 },
   items: {
     countAt4: 25,

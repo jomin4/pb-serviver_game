@@ -1,5 +1,6 @@
 import { CONFIG } from '../../src/config.ts';
-import type { ItemState, PlayerInput, PlayerState, World } from '../../src/types.ts';
+import { createWorld } from '../../src/round.ts';
+import type { ItemState, PlayerInput, PlayerState, StalkerState, World } from '../../src/types.ts';
 
 /** 테스트용 PlayerState. 기본값은 B1 (1.5, 1.5)에 선 살아 있는 플레이어. */
 export function makePlayer(partial: Partial<PlayerState> = {}): PlayerState {
@@ -69,5 +70,25 @@ export function makeWorld(partial: Partial<World> = {}): World {
     round: { clock: 0, target: 250, truckTotal: 0, phase: 'playing', watcherSpawned: false, lightsHalved: false, horned: false },
     events: [],
     ...partial,
+  };
+}
+
+/**
+ * step 테스트용 parking-lot 월드. 플레이어는 스폰 위치(트럭 구역 안)에서 시작하고,
+ * 결정성을 위해 폐품·추적형·조명을 모두 비운다(필요하면 테스트가 직접 놓는다). 시선형은 비활성이다.
+ */
+export function makeParkingWorld(playerIds: string[] = ['a'], seed = 1): World {
+  const world = createWorld({ mapId: 'parking-lot', seed, players: playerIds.map(id => ({ id, name: id })) });
+  world.items = {};
+  world.stalkers = [];
+  world.lights = [];
+  return world;
+}
+
+/** 테스트용 추적형. 기본은 B1 배회 상태. */
+export function makeStalker(partial: Partial<StalkerState> = {}): StalkerState {
+  return {
+    id: 'stalker-1', floor: 0, pos: { x: 20.5, y: 20.5 }, mode: 'patrol', targetId: null, goal: null,
+    timer: 0, patrolIndex: 0, routeIndex: 0, path: [], ...partial,
   };
 }

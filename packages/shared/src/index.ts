@@ -19,3 +19,4 @@ export { startRetreat, stalkerContacts, updateStalker } from './monsters/stalker
 export { isWatcherLit, updateWatcher, watcherContacts } from './monsters/watcher.ts';
 export { applyGhostMovement, tryFlicker } from './ghost.ts';
 export { tickCooldowns, tryChat, tryPing } from './comms.ts';
+export { cloneWorld, step } from './step.ts';
