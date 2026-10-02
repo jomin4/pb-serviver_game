@@ -49,6 +49,43 @@ export function bfsDistances(map: MapData, floor: FloorId, from: Vec): Int32Arra
   return dist;
 }
 
+/**
+ * 여러 출발점에서 동시에 시작하는 BFS. 4방향 걸음 수이며 계단 칸에서 반대편 칸으로 1걸음에 넘어간다.
+ * 반환은 [B1, B2] 거리 배열(인덱스 = ty * width + tx), 도달 불가 = -1.
+ * 이동 불가 칸의 출발점은 무시한다.
+ */
+export function bfsDistancesAllFloors(map: MapData, sources: { floor: FloorId; pos: Vec }[]): [Int32Array, Int32Array] {
+  const dist: [Int32Array, Int32Array] = [
+    new Int32Array(map.floors[0].width * map.floors[0].height).fill(-1),
+    new Int32Array(map.floors[1].width * map.floors[1].height).fill(-1),
+  ];
+  const queue: { floor: FloorId; x: number; y: number }[] = [];
+  for (const s of sources) {
+    const x = Math.floor(s.pos.x);
+    const y = Math.floor(s.pos.y);
+    if (!isWalkableTile(map, s.floor, x, y)) continue;
+    const i = y * map.floors[s.floor].width + x;
+    if (dist[s.floor][i] !== -1) continue;
+    dist[s.floor][i] = 0;
+    queue.push({ floor: s.floor, x, y });
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const { floor, x, y } = queue[head]!;
+    const d = dist[floor][y * map.floors[floor].width + x]!;
+    const visit = (f: FloorId, nx: number, ny: number): void => {
+      if (!isWalkableTile(map, f, nx, ny)) return;
+      const ni = ny * map.floors[f].width + nx;
+      if (dist[f][ni] !== -1) return;
+      dist[f][ni] = d + 1;
+      queue.push({ floor: f, x: nx, y: ny });
+    };
+    for (const [dx, dy] of NEIGHBORS) visit(floor, x + dx, y + dy);
+    const other = stairsAt(map, floor, { x, y });
+    if (other) visit(other.floor, Math.floor(other.tile.x), Math.floor(other.tile.y));
+  }
+  return dist;
+}
+
 /** 그 칸이 계단이면 연결된 반대편, 아니면 null. */
 export function stairsAt(map: MapData, floor: FloorId, tile: Vec): { floor: FloorId; tile: Vec } | null {
   const tx = Math.floor(tile.x);
