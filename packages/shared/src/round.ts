@@ -133,10 +133,13 @@ export function inTruckZone(map: MapData, p: PlayerState): boolean {
   return p.floor === 0 && p.pos.x >= z.x && p.pos.x < z.x + z.w && p.pos.y >= z.y && p.pos.y < z.y + z.h;
 }
 
+/** 누름 시간 누적의 부동소수 오차 허용치(dt 0.05 × 60 = 2.9999…도 3초로 본다). stalker·comms와 같은 관례. */
+const HOLD_EPS = 1e-9;
+
 /**
  * (world를 직접 변경) 조기 출발 누름 판정. held는 이번 틱에 상호작용을 누르고 있는 플레이어 id.
  * 살아 있는 플레이어가 1명 이상이고 전원 트럭 구역에 있을 때만 누적(누른 사람은 += dt, 뗀 사람은 0)하고,
- * 누적이 departHoldSeconds 이상인 사람이 있으면 true. 조건이 깨지면 모두 0으로 되돌리고 false.
+ * 누적이 departHoldSeconds 이상(HOLD_EPS 허용)인 사람이 있으면 true. 조건이 깨지면 모두 0으로 되돌리고 false.
  */
 export function updateDepartHold(world: World, map: MapData, held: Record<string, boolean>, dt: number): boolean {
   const all = Object.values(world.players);
@@ -149,7 +152,7 @@ export function updateDepartHold(world: World, map: MapData, held: Record<string
   for (const p of all) {
     if (!p.alive) { p.interactHeld = 0; continue; }
     p.interactHeld = held[p.id] ? p.interactHeld + dt : 0;
-    if (p.interactHeld >= CONFIG.player.departHoldSeconds) depart = true;
+    if (p.interactHeld >= CONFIG.player.departHoldSeconds - HOLD_EPS) depart = true;
   }
   return depart;
 }

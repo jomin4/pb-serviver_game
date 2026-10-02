@@ -287,6 +287,14 @@ describe('updateDepartHold', () => {
     expect(w.players.a!.interactHeld).toBeCloseTo(2.9);
     expect(updateDepartHold(w, map, held, 0.1)).toBe(true);
   });
+  it('dt 0.05로 정확히 60번째 호출에 출발한다(부동소수 누적 오차 허용)', () => {
+    const w = two();
+    const held = { a: true, b: true };
+    const results: boolean[] = [];
+    for (let i = 0; i < 60; i++) results.push(updateDepartHold(w, map, held, 0.05));
+    expect(results.slice(0, 59).every(r => !r)).toBe(true);
+    expect(results[59]).toBe(true);
+  });
   it('누르지 않는 사람의 누적은 0으로 리셋된다', () => {
     const w = two();
     updateDepartHold(w, map, { a: true, b: true }, 1);

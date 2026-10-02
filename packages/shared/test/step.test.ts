@@ -528,9 +528,8 @@ describe('step: 출발과 시계', () => {
       w = step(w, { a: [{ ...hold.a[0]!, seq }], b: [{ ...hold.b[0]!, seq }] }, DT);
     }
     expect(w.round.phase).toBe('success');
-    // 3초(60틱). 0.05의 누적 오차로 한 틱 늦을 수 있다.
-    expect(w.tick).toBeGreaterThanOrEqual(CONFIG.player.departHoldSeconds / DT);
-    expect(w.tick).toBeLessThanOrEqual(CONFIG.player.departHoldSeconds / DT + 1);
+    // 정확히 3초(60틱).
+    expect(w.tick).toBe(60);
     expect(ofType(w, 'roundEnd')).toEqual([{ type: 'roundEnd', phase: 'success' }]);
   });
 
