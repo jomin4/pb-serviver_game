@@ -50,8 +50,15 @@ export function cloneWorld(world: World): World {
   };
 }
 
-/** 이 틱에 이 플레이어가 한 일 중 틱 끝에서 필요한 요약. */
-type TickSummary = { latestInteract: boolean; ran: boolean; startFloor: PlayerState['floor']; startPos: PlayerState['pos'] };
+/**
+ * 이 틱에 이 플레이어가 한 일 중 틱 끝에서 필요한 요약.
+ * `latestInteract`는 입력을 하나씩 적용하며 갱신되는 상호작용 레벨(틱 끝에는 마지막 입력의 값),
+ * `pressed`는 틱 안의 어느 입력에서든 떼었다 누른 엣지가 있었는지(한 틱 안의 짧은 탭도 잡는다).
+ */
+type TickSummary = {
+  latestInteract: boolean; pressed: boolean; ran: boolean;
+  startFloor: PlayerState['floor']; startPos: PlayerState['pos'];
+};
 
 /** 이동 거리가 이 값 미만이면 "움직이지 않았다"로 본다(타일). */
 const MOVED_EPS = 0.01;
@@ -84,10 +91,13 @@ function clampPing(map: MapData, p: PlayerState, ping: { x: number; y: number })
   return { x: Math.min(width, Math.max(0, ping.x)), y: Math.min(height, Math.max(0, ping.y)) };
 }
 
-/** 입력 하나를 `inputDt`초 동안 적용한다. 요약(`ran`)을 갱신한다. */
+/** 입력 하나를 `inputDt`초 동안 적용한다. 요약(`ran`, `pressed`, `latestInteract`)을 갱신한다. */
 function applyOneInput(world: World, map: MapData, id: string, input: PlayerInput, inputDt: number, summary: TickSummary): void {
   let p = world.players[id]!;
   const living = p.alive;
+
+  if (input.interact && !summary.latestInteract) summary.pressed = true;
+  summary.latestInteract = input.interact;
 
   if (input.selectSlot !== null) p.selectedSlot = input.selectSlot;
   if (living && input.toggleFlashlight) {
@@ -145,16 +155,17 @@ export function step(world: World, inputsByPlayer: Record<string, PlayerInput[]>
   for (const id of ids) {
     const p0 = w.players[id]!;
     const inputs = selectInputs(p0, inputsByPlayer[id]);
-    const summary: TickSummary = { latestInteract: p0.prevInteract, ran: false, startFloor: p0.floor, startPos: { x: p0.pos.x, y: p0.pos.y } };
+    const summary: TickSummary = {
+      latestInteract: p0.prevInteract, pressed: false, ran: false,
+      startFloor: p0.floor, startPos: { x: p0.pos.x, y: p0.pos.y },
+    };
     summaries[id] = summary;
     if (inputs.length === 0) {
       applyOneInput(w, map, id, neutralInput(p0), dt, summary);
     } else {
       const inputDt = dt / inputs.length;
       for (const input of inputs) applyOneInput(w, map, id, input, inputDt, summary);
-      const last = inputs[inputs.length - 1]!;
-      w.players[id]!.lastSeq = last.seq;
-      summary.latestInteract = last.interact;
+      w.players[id]!.lastSeq = inputs[inputs.length - 1]!.seq;
     }
   }
 
@@ -168,11 +179,11 @@ export function step(world: World, inputsByPlayer: Record<string, PlayerInput[]>
     else if (moved) emitNoise(w, p.floor, p.pos, CONFIG.noise.walk);
   }
 
-  // 3. 상호작용(누름 엣지): id 순
+  // 3. 상호작용(누름 엣지, 틱 안의 어느 입력에서든): id 순
   for (const id of ids) {
     const p = w.players[id]!;
     const s = summaries[id]!;
-    if (p.alive && s.latestInteract && !p.prevInteract) {
+    if (p.alive && s.pressed) {
       if (inTruckZone(map, p) && p.inventory.length > 0) {
         loadIntoTruck(w, id);
       } else {

@@ -383,6 +383,39 @@ describe('step: 상호작용', () => {
     expect(again.players.a!.inventory).toEqual(['near', 'far']);
   });
 
+  it('한 틱 안에서 눌렀다 뗀 짧은 탭도 줍는다', () => {
+    const w = makeParkingWorld(['a']);
+    w.players.a!.pos = { x: 20.5, y: 20.5 };
+    w.items.near = makeItem('near', 5, { pos: { x: 20.6, y: 20.5 } });
+    const tap = [true, true, false].map((interact, i) => makeInput({ seq: i + 1, interact }));
+    const out = step(w, { a: tap }, DT);
+    expect(out.players.a!.inventory).toEqual(['near']);
+    expect(out.players.a!.prevInteract).toBe(false);
+  });
+
+  it('여러 틱에 걸쳐 누르고 있으면(틱마다 입력 여러 개) 한 번만 줍는다', () => {
+    const w = makeParkingWorld(['a']);
+    w.players.a!.pos = { x: 20.5, y: 20.5 };
+    w.items.near = makeItem('near', 5, { pos: { x: 20.6, y: 20.5 } });
+    w.items.far = makeItem('far', 5, { pos: { x: 21.5, y: 20.5 } });
+    let cur = step(w, { a: [false, true, true].map((interact, i) => makeInput({ seq: i + 1, interact })) }, DT);
+    expect(cur.players.a!.inventory).toEqual(['near']);
+    cur = step(cur, { a: [true, true, true].map((interact, i) => makeInput({ seq: i + 4, interact })) }, DT);
+    cur = step(cur, {}, DT);
+    expect(cur.players.a!.inventory).toEqual(['near']);
+    // 이전 틱부터 누르고 있다가 이번 틱에 떼고 다시 누르면 새 엣지다
+    cur = step(cur, { a: [true, false, true].map((interact, i) => makeInput({ seq: i + 7, interact })) }, DT);
+    expect(cur.players.a!.inventory).toEqual(['near', 'far']);
+  });
+
+  it('출발 누름은 틱의 마지막 입력 상태를 따른다: 한 틱 안의 탭은 누적되지 않는다', () => {
+    const w = makeParkingWorld(['a']);
+    const tap = step(w, { a: [true, false].map((interact, i) => makeInput({ seq: i + 1, interact })) }, DT);
+    expect(tap.players.a!.interactHeld).toBe(0);
+    const hold = step(w, { a: [false, true].map((interact, i) => makeInput({ seq: i + 1, interact })) }, DT);
+    expect(hold.players.a!.interactHeld).toBeCloseTo(DT, 10);
+  });
+
   it('트럭 구역이라도 빈손이면 주변 폐품을 줍는다', () => {
     const w = makeParkingWorld(['a']);
     w.items.i1 = makeItem('i1', 5, { pos: { x: 3.5, y: 34.9 } });
