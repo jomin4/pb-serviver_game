@@ -62,7 +62,11 @@ export const CONFIG = {
     chatCooldown: 1,
     quickChats: ['여기로', '도와줘!', '폐품 있음', '도망쳐!', '비춰줘!', '트럭으로'],
   },
-  net: { maxMessagesPerSecond: 60, maxInputsPerBatch: 10, maxDt: 0.1, nicknameMax: 10, roomCodeLength: 6, interpolationMs: 100 },
+  net: {
+    maxMessagesPerSecond: 60, maxInputsPerBatch: 10, maxDt: 0.1, nicknameMax: 10, roomCodeLength: 6, interpolationMs: 100,
+    /** 클라이언트가 입력을 샘플링하는 고정 빈도(Hz). 모니터 주사율과 무관하게 서버 틱당 입력 수를 한도 아래로 유지한다. */
+    inputSampleHz: 60,
+  },
   /** 화면 기준 해상도(px)와 1타일의 기준 px(스펙 4.1). */
   view: { width: 960, height: 540, tilePx: 32 },
   fx: {

@@ -6,6 +6,7 @@ import { createAudioDirector } from './audio/director.ts';
 import {
   createInputState, onBlur, onKeyDown, onKeyUp, onMouseDown, onMouseMove, onWheel, sampleInput, setSelectedSlot,
 } from './input/keyboard.ts';
+import { createSampleClock } from './input/sampleClock.ts';
 import { createSender } from './input/sender.ts';
 import type { GameRoom } from './net/connection.ts';
 import { createCamera } from './render/camera.ts';
@@ -26,7 +27,7 @@ import type { GameElements } from './ui/screens.ts';
 
 /**
  * 게임 화면 한 번(라운드 진행 중, 같은 방 연결 하나)의 수명. 방 상태 → 렌더 스냅숏 → 매 프레임 그리기.
- * - 내 캐릭터: 프레임마다 입력을 샘플링해 즉시 예측 적용(`predictor.apply`), 상태 패치마다 `reconcile`.
+ * - 내 캐릭터: 고정 빈도(`CONFIG.net.inputSampleHz`)로 입력을 샘플링해 즉시 예측 적용(`predictor.apply`), 상태 패치마다 `reconcile`.
  *   조준은 로컬 값을 바로 쓴다(스펙 3.3).
  * - 다른 플레이어·몬스터(그리고 유령인 나): 패치마다 보간기에 넣고 그릴 때 샘플링한다.
  * - 소리: 세션마다 `Audio`를 하나 만들어 프레임·이벤트·상태 변화를 `audioDirector`에 먹인다. Esc는 메뉴(소리·음량·나가기)를 연다.
@@ -95,6 +96,7 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
     try { room.send('input', batch); } catch (err) { console.warn('input send failed', err); }
   });
   const interpolator = createInterpolator();
+  const sampleClock = createSampleClock();
   const hud: Hud = createHud(els.hudHost);
   const audio = createAudio();
   const audioDirector = createAudioDirector(audio);
@@ -228,11 +230,17 @@ export function startGame(room: GameRoom, els: GameElements, onLeave: () => void
 
     camera.follow(viewPos);
     if (mouseScreen) onMouseMove(input, camera.screenToWorld(mouseScreen), viewPos);
-    const inp = sampleInput(input, seq++);
-    if (inp.selectSlot !== null) pendingSlotSeq = inp.seq;
-    sender.push(inp);
-    const moved = predictor.apply(inp, self, items, dt);
-    self = { ...moved, colorIndex: self.colorIndex, aim: input.aim, selectedSlot: inp.selectSlot ?? self.selectedSlot };
+    // 입력은 rAF 주기가 아니라 고정 빈도(CONFIG.net.inputSampleHz)로 샘플링한다. 엣지 플래그는 샘플링될 때까지
+    // InputState에 남아 있으므로 샘플을 만들지 않는 프레임에도 사라지지 않는다. 예측은 샘플마다 고정 dt로 적용한다.
+    const samples = sampleClock.advance(dt);
+    for (let i = 0; i < samples; i++) {
+      const inp = sampleInput(input, seq++);
+      if (inp.selectSlot !== null) pendingSlotSeq = inp.seq;
+      sender.push(inp);
+      const moved = predictor.apply(inp, self, items, sampleClock.step);
+      self = { ...moved, colorIndex: self.colorIndex, aim: input.aim, selectedSlot: inp.selectSlot ?? self.selectedSlot };
+    }
+    self = { ...self, aim: input.aim };
 
     const me: RenderPlayer = ghostPose ? { ...self, pos: ghostPose.pos, floor: ghostPose.floor } : self;
     const time = currentTime(t);

@@ -74,3 +74,28 @@ export function sanitizeBatch(raw: unknown): PlayerInput[] {
   }
   return out;
 }
+
+/**
+ * 입력 목록(오래된 것부터)을 최근 `max`개로 줄인다. 버려지는 입력의 엣지는 잃지 않도록
+ * 남는 가장 오래된 입력에 접는다: 불리언 엣지(손전등 토글·버리기·깜빡임)는 하나라도 true면 true,
+ * 칸 선택·핑·퀵챗은 (남는 입력 자신을 포함해) 가장 최근의 null 아닌 값. 이동·뛰기·조준·상호작용 같은
+ * 레벨 값은 남는 입력의 것을 그대로 쓴다. 입력 배열과 객체는 바꾸지 않는다.
+ */
+export function capInputs(inputs: PlayerInput[], max: number = CONFIG.net.maxInputsPerBatch): PlayerInput[] {
+  if (inputs.length <= max) return inputs;
+  const cut = inputs.length - max;
+  const kept = inputs.slice(cut);
+  if (kept.length === 0) return kept;
+  const folded: PlayerInput = { ...kept[0]! };
+  for (let i = cut - 1; i >= 0; i--) {
+    const d = inputs[i]!;
+    folded.toggleFlashlight ||= d.toggleFlashlight;
+    folded.drop ||= d.drop;
+    folded.flicker ||= d.flicker;
+    folded.selectSlot ??= d.selectSlot;
+    folded.ping ??= d.ping;
+    folded.chat ??= d.chat;
+  }
+  kept[0] = folded;
+  return kept;
+}

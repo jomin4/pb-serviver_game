@@ -368,6 +368,24 @@ describe('RoundRoom 입력 큐', () => {
   });
 });
 
+describe('RoundRoom 입력 큐: 엣지 보존', () => {
+  it('큐가 넘쳐 버려지는 오래된 입력의 엣지(퀵챗)는 남는 입력에 접혀 처리된다', async () => {
+    const room = await colyseus.createRoom('round', opts('방장')) as RoundRoom;
+    const host = await colyseus.connectTo(room, opts('방장'));
+    await waitFor(() => room.state.players.size === 1);
+    const events = collect(host, 'event') as GameEvent[];
+    host.send('start');
+    await waitFor(() => room.world !== null && room.world.tick >= 2);
+    // 한 틱 안에 30개: 맨 처음 입력만 퀵챗을 담는다(큐 트림에서 버려지는 쪽)
+    for (let m = 0; m < 3; m++) {
+      host.send('input', Array.from({ length: 10 }, (_, i) => input(m * 10 + i + 1, { chat: m === 0 && i === 0 ? 2 : null })));
+    }
+    await waitFor(() => room.state.players.get(host.sessionId)!.lastSeq === 30);
+    await waitFor(() => events.some((e) => e.type === 'chat'));
+    expect(events.filter((e) => e.type === 'chat')).toEqual([{ type: 'chat', playerId: host.sessionId, index: 2 }]);
+  });
+});
+
 describe('RoundRoom 생성 옵션', () => {
   it('클라이언트가 보낸 reconnectSeconds는 무시한다(서버 기본값 사용)', async () => {
     const room = await colyseus.createRoom('plain', opts('방장', { reconnectSeconds: 0.001 })) as RoundRoom;

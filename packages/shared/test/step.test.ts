@@ -140,14 +140,17 @@ describe('step: 입력 선별', () => {
     expect(ofType(out, 'chat')).toEqual([{ type: 'chat', playerId: 'a', index: 0 }]);
   });
 
-  it('입력은 마지막 10개만 쓴다', () => {
-    const many = Array.from({ length: 12 }, (_, i) => makeInput({ seq: i + 1, chat: i === 0 ? 1 : null }));
-    const out = step(makeParkingWorld(['a']), { a: many }, DT);
-    expect(ofType(out, 'chat')).toEqual([]);
+  it('입력은 마지막 10개만 쓰되, 버려진 입력의 엣지(퀵챗 등)는 남는 입력에 접혀 살아남는다', () => {
+    const w = makeParkingWorld(['a']);
+    const start = w.players.a!.pos.x;
+    // 처음 두 개(버려질 것)만 오른쪽으로 걷고 퀵챗·손전등을 담는다
+    const many = Array.from({ length: 12 }, (_, i) =>
+      makeInput({ seq: i + 1, chat: i === 0 ? 1 : null, toggleFlashlight: i === 1, move: { x: i < 2 ? 1 : 0, y: 0 } }));
+    const out = step(w, { a: many }, DT);
+    expect(ofType(out, 'chat')).toEqual([{ type: 'chat', playerId: 'a', index: 1 }]);
+    expect(out.players.a!.flashlightOn).toBe(!w.players.a!.flashlightOn);
+    expect(out.players.a!.pos.x).toBe(start); // 이동은 접지 않는다
     expect(out.players.a!.lastSeq).toBe(12);
-
-    const ten = many.slice(2).map((m, i) => ({ ...m, chat: i === 0 ? (1 as const) : null }));
-    expect(ofType(step(makeParkingWorld(['a']), { a: ten }, DT), 'chat')).toHaveLength(1);
   });
 
   it('입력이 없으면 중립 입력을 쓴다: 가만히 서 있고 aim은 그대로', () => {

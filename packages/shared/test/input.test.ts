@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { len } from '../src/geometry.ts';
-import { EMPTY_INPUT, sanitizeBatch, sanitizeInput } from '../src/input.ts';
+import { capInputs, EMPTY_INPUT, sanitizeBatch, sanitizeInput } from '../src/input.ts';
 import type { PlayerInput } from '../src/types.ts';
 
 const ok: PlayerInput = {
@@ -99,5 +99,47 @@ describe('sanitizeBatch', () => {
   it('앞의 10개만 보고 그중 유효한 것만 남긴다', () => {
     const raw = [...Array(9).fill('bad'), {...ok, seq: 10}, {...ok, seq: 11}];
     expect(sanitizeBatch(raw).map((i) => i.seq)).toEqual([10]);
+  });
+});
+
+describe('capInputs', () => {
+  const mk = (seq: number, patch: Partial<PlayerInput> = {}): PlayerInput => ({ ...EMPTY_INPUT(seq), ...patch });
+
+  it('한도 이하면 그대로 돌려준다', () => {
+    const list = [mk(1, { chat: 0 }), mk(2)];
+    expect(capInputs(list, 10)).toEqual(list);
+  });
+
+  it('한도를 넘으면 최근 max개만 남긴다(순서 유지)', () => {
+    const list = Array.from({ length: 12 }, (_, i) => mk(i + 1));
+    expect(capInputs(list, 10).map((i) => i.seq)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it('버려지는 입력의 불리언 엣지(손전등·버리기·깜빡임)는 남는 가장 오래된 입력에 접힌다', () => {
+    const list = [mk(1, { toggleFlashlight: true }), mk(2, { drop: true }), mk(3, { flicker: true }), mk(4), mk(5)];
+    const out = capInputs(list, 2);
+    expect(out.map((i) => i.seq)).toEqual([4, 5]);
+    expect(out[0]).toMatchObject({ seq: 4, toggleFlashlight: true, drop: true, flicker: true });
+    expect(out[1]).toEqual(mk(5));
+  });
+
+  it('칸 선택·핑·퀵챗은 가장 최근의 null 아닌 값을 남긴다', () => {
+    const list = [
+      mk(1, { selectSlot: 1, ping: { x: 1, y: 1 }, chat: 0 }),
+      mk(2, { selectSlot: 2, chat: 1 }),
+      mk(3, { ping: { x: 3, y: 3 } }),
+      mk(4, { chat: 2 }),
+      mk(5),
+    ];
+    const out = capInputs(list, 2);
+    expect(out[0]).toMatchObject({ seq: 4, selectSlot: 2, ping: { x: 3, y: 3 }, chat: 2 });
+  });
+
+  it('입력 배열과 입력 객체를 바꾸지 않는다. 이동·조준·상호작용 레벨은 남는 입력의 값', () => {
+    const list = [mk(1, { drop: true, interact: true, move: { x: 1, y: 0 }, aim: 1 }), mk(2, { aim: 2 }), mk(3)];
+    const before = JSON.parse(JSON.stringify(list)) as PlayerInput[];
+    const out = capInputs(list, 2);
+    expect(list).toEqual(before);
+    expect(out[0]).toEqual({ ...mk(2, { aim: 2 }), drop: true });
   });
 });

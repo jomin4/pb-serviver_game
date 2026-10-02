@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Room, ServerError, matchMaker } from 'colyseus';
-import { CONFIG, createWorld, dropAll, generateRoomCode, sanitizeBatch, step } from '@bh/shared';
+import { CONFIG, capInputs, createWorld, dropAll, generateRoomCode, sanitizeBatch, step } from '@bh/shared';
 import type { GameEvent, PlayerInput, World } from '@bh/shared';
 import { dedupeNickname, nextHost, validateNickname } from './lobby.ts';
 import { PlayerS, RoomState, syncSchema } from './schema.ts';
@@ -70,10 +70,9 @@ export class RoundRoom extends Room<{ state: RoomState }> {
       if (this.state.phase !== 'playing' || !world || !world.players[client.sessionId]) return;
       const inputs = sanitizeBatch(message);
       if (inputs.length === 0) return;
-      const queue = (this.queues[client.sessionId] ??= []);
-      queue.push(...inputs);
-      // 오래된 것부터 버리고 최근 maxInputsPerBatch개만 남긴다.
-      if (queue.length > CONFIG.net.maxInputsPerBatch) queue.splice(0, queue.length - CONFIG.net.maxInputsPerBatch);
+      const queue = (this.queues[client.sessionId] ?? []).concat(inputs);
+      // 오래된 것부터 버리고 최근 maxInputsPerBatch개만 남긴다. 버려지는 입력의 엣지는 남는 입력에 접는다.
+      this.queues[client.sessionId] = capInputs(queue, CONFIG.net.maxInputsPerBatch);
     });
     this.handle('again', () => {
       if (this.state.phase !== 'result') return;

@@ -6,6 +6,7 @@ import { dropAll, dropSelected, loadIntoTruck, nearestPickable, pickUp } from '.
 import { getMap } from './map/index.ts';
 import type { MapData } from './map/index.ts';
 import { applyPlayerMovement, unstick } from './movement.ts';
+import { capInputs } from './input.ts';
 import { emitNoise } from './noise.ts';
 import { startRetreat, stalkerContacts, updateStalker } from './monsters/stalker.ts';
 import { updateWatcher, watcherContacts } from './monsters/watcher.ts';
@@ -71,7 +72,10 @@ function neutralInput(p: PlayerState): PlayerInput {
   };
 }
 
-/** seq 오름차순, 이미 처리한 seq 이하와 중복은 버리고, 마지막 maxInputsPerBatch개만 남긴다. */
+/**
+ * seq 오름차순, 이미 처리한 seq 이하와 중복은 버리고, 마지막 maxInputsPerBatch개만 남긴다
+ * (버려지는 입력의 엣지는 `capInputs`가 남는 입력에 접는다).
+ */
 function selectInputs(p: PlayerState, list: PlayerInput[] | undefined): PlayerInput[] {
   if (!list || list.length === 0) return [];
   const sorted = list.slice().sort((a, b) => a.seq - b.seq);
@@ -82,7 +86,7 @@ function selectInputs(p: PlayerState, list: PlayerInput[] | undefined): PlayerIn
     fresh.push(input);
     last = input.seq;
   }
-  return fresh.slice(-CONFIG.net.maxInputsPerBatch);
+  return capInputs(fresh, CONFIG.net.maxInputsPerBatch);
 }
 
 /** 핑 좌표를 플레이어가 있는 층의 맵 경계 [0, 너비] × [0, 높이] 안으로 제한한다. */
