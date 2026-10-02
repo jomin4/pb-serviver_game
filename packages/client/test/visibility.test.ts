@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '@bh/shared';
 import type { FloorId, ItemState, LightState, MapData, Vec } from '@bh/shared';
-import { isLightLit, lightSources, litAreas, visibleEntities } from '../src/render/visibility.ts';
+import { dangerDistance, isLightLit, lightSources, litAreas, visibleEntities } from '../src/render/visibility.ts';
 import type { MonsterView, RenderPlayer, RenderSnapshot } from '../src/render/visibility.ts';
 
 /**
@@ -270,5 +270,19 @@ describe('litAreas', () => {
     // x=6 벽(y 1..3) 너머로는 넘어가지 않는다
     const beyond = area.poly.filter((p) => p.y < 3.5 && p.x > 6 + 1e-6);
     expect(beyond).toEqual([]);
+  });
+});
+
+describe('dangerDistance', () => {
+  const me = player('me');
+  it('위험 거리 안의 같은 층 활성 몬스터 중 가장 가까운 거리', () => {
+    const s = snap(me, { monsters: [monster('a', { x: 6.5, y: 6.5 }), monster('b', { x: 4.5, y: 6.5 }), monster('c', { x: 40, y: 6.5 })] });
+    expect(dangerDistance(s)).toBeCloseTo(2);
+  });
+  it('다른 층·비활성·먼 몬스터는 무시하고, 없으면 null', () => {
+    const s = snap(me, {
+      monsters: [monster('floor', { x: 3.5, y: 6.5 }, 1), monster('off', { x: 3.5, y: 6.5 }, 0, { active: false }), monster('far', { x: 20, y: 6.5 })],
+    });
+    expect(dangerDistance(s)).toBeNull();
   });
 });

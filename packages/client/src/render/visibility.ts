@@ -4,7 +4,8 @@ import type { WorldRect } from './camera.ts';
 
 /** 렌더용 플레이어. 서버 상태 모양(`PlayerState`)에 색 번호를 더했다. */
 export type RenderPlayer = PlayerState & { colorIndex: number };
-export type MonsterView = { id: string; kind: 'stalker' | 'watcher'; pos: Vec; floor: FloorId; active: boolean };
+/** `moving`·`frozen`은 서버가 알려주는 값(소리가 읽는다). 없으면 모른다. */
+export type MonsterView = { id: string; kind: 'stalker' | 'watcher'; pos: Vec; floor: FloorId; active: boolean; moving?: boolean; frozen?: boolean };
 export type PingView = { pos: Vec; floor: FloorId; until: number };
 
 /**
@@ -54,6 +55,18 @@ export function isLightLit(l: LightState, time: number): boolean {
   if (!l.on) return false;
   const blinking = l.flickering || time < l.flickerUntil;
   return !blinking || Math.floor(time * CONFIG.fx.flickerBlinkHz) % 2 === 1;
+}
+
+/** 같은 층의 활성 몬스터 중 가장 가까운 거리. `CONFIG.fx.dangerDistance` 이하일 때만, 아니면 null (긴장 효과·심장 소리). */
+export function dangerDistance(snap: RenderSnapshot): number | null {
+  const self = snap.self;
+  let best: number | null = null;
+  for (const m of snap.monsters) {
+    if (!m.active || m.floor !== self.floor) continue;
+    const d = dist(m.pos, self.pos);
+    if (d <= CONFIG.fx.dangerDistance && (best === null || d < best)) best = d;
+  }
+  return best;
 }
 
 /** 트럭 구역(B1) 가운데. */

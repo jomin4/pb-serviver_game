@@ -110,7 +110,7 @@ function render(r: GameRoom): void {
       if (drawn === 'playing') return;
       drawn = 'playing';
       stopGame();
-      game = startGame(r, showGame());
+      game = startGame(r, showGame(), leave);
       return;
     }
     case 'result': {
@@ -170,6 +170,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).get('debug') ===
       return state?.toJSON ? state.toJSON() : null;
     },
     getRender: () => game?.snapshot() ?? null,
+    getAudio: () => game?.audioState() ?? null,
   };
 }
 

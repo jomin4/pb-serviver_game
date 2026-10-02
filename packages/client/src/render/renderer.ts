@@ -1,10 +1,10 @@
-import { CONFIG, dist } from '@bh/shared';
+import { CONFIG } from '@bh/shared';
 import type { MapData, Vec } from '@bh/shared';
 import type { Camera } from './camera.ts';
 import { DRAW_TABLE } from './drawTable.ts';
 import { createDarkness } from './lighting.ts';
 import { createMapLayer } from './mapLayer.ts';
-import { litAreas, visibleEntities } from './visibility.ts';
+import { dangerDistance, litAreas, visibleEntities } from './visibility.ts';
 import type { RenderSnapshot } from './visibility.ts';
 
 export type Renderer = {
@@ -100,11 +100,6 @@ export function createRenderer(canvas: HTMLCanvasElement, map: MapData, cam: Cam
     c.fillRect(0, 0, w, h);
   }
 
-  function nearMonster(snap: RenderSnapshot): boolean {
-    const self = snap.self;
-    return snap.monsters.some((m) => m.active && m.floor === self.floor && dist(m.pos, self.pos) <= CONFIG.fx.dangerDistance);
-  }
-
   return {
     shake() {
       shakeUntil = clockSeconds() + CONFIG.fx.shakeSeconds;
@@ -154,7 +149,7 @@ export function createRenderer(canvas: HTMLCanvasElement, map: MapData, cam: Cam
 
       // 5. 효과
       drawPings(ctx, snap, now);
-      if (self.alive && nearMonster(snap)) {
+      if (self.alive && dangerDistance(snap) !== null) {
         const pulse = 0.55 + 0.2 * Math.sin(now * 2 * Math.PI * 1.2);
         edgeGlow(ctx, `rgba(40,0,0,${pulse.toFixed(3)})`, 0.25);
       }

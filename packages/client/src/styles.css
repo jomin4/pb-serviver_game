@@ -194,3 +194,13 @@ button.link-button { align-self: center; background: none; border: none; color: 
   padding: 10px 18px; border-radius: 6px;
   background: var(--bad); color: #fff; font-weight: 600;
 }
+
+.menu-overlay { font-size: 18px; }
+.menu-panel {
+  display: flex; flex-direction: column; gap: 14px;
+  width: min(320px, calc(100vw - 32px)); padding: 20px;
+  background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
+}
+.menu-title { margin: 0; font-size: 1.1em; text-align: center; }
+.menu-volume-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
+.menu-volume-row input[type='range'] { width: 100%; }

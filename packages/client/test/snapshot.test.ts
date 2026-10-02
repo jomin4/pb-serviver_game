@@ -34,7 +34,7 @@ describe('schema → 렌더 상태 변환', () => {
 
   it('몬스터와 조명', () => {
     expect(toMonster({ id: 'w', kind: 'watcher', mode: '', active: false, moving: false, frozen: true, floor: 1, x: 5, y: 6 }))
-      .toEqual({ id: 'w', kind: 'watcher', pos: { x: 5, y: 6 }, floor: 1, active: false });
+      .toEqual({ id: 'w', kind: 'watcher', pos: { x: 5, y: 6 }, floor: 1, active: false, moving: false, frozen: true });
     expect(toMonster({ id: 's', kind: 'stalker', mode: 'chase', active: true, moving: true, frozen: false, floor: 0, x: 1, y: 1 }).kind).toBe('stalker');
     expect(toLight({ id: 'l', floor: 0, x: 7.5, y: 5.5, radius: 5, on: true, flickering: true, flickerUntil: 12 }))
       .toEqual({ id: 'l', floor: 0, pos: { x: 7.5, y: 5.5 }, radius: 5, on: true, flickering: true, flickerUntil: 12 });

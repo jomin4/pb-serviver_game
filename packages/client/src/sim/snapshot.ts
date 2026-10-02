@@ -47,7 +47,7 @@ export function toItem(i: ItemSchemaView): ItemState {
 }
 
 export function toMonster(m: MonsterSchemaView): MonsterView {
-  return { id: m.id, kind: m.kind === 'watcher' ? 'watcher' : 'stalker', pos: { x: m.x, y: m.y }, floor: floorOf(m.floor), active: m.active };
+  return { id: m.id, kind: m.kind === 'watcher' ? 'watcher' : 'stalker', pos: { x: m.x, y: m.y }, floor: floorOf(m.floor), active: m.active, moving: m.moving, frozen: m.frozen };
 }
 
 export function toLight(l: LightSchemaView): LightState {

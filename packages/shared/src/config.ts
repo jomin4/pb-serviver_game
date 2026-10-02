@@ -87,4 +87,31 @@ export const CONFIG = {
     noticeSeconds: 4,
   },
   pathfinding: { stairsCost: 1 },
+  /** 클라이언트 소리(스펙 4.4). 거리는 타일, 시간은 초, 음량은 0~1 배율(마스터 음량에 곱한다). */
+  audio: {
+    /** 설정을 읽지 못할 때의 기본값. */
+    defaultEnabled: true,
+    defaultVolume: 0.8,
+    /** 소리 종류별로 들리는 최대 거리. 이보다 멀면(또는 다른 층이면) 재생하지 않는다. */
+    maxDistance: { stalkerStep: 12, watcherDrag: 14, teammateRun: 10 },
+    volume: {
+      stalkerStep: 0.9, watcherDrag: 0.5, teammateRun: 0.5, pickup: 0.5, buzz: 0.35, horn: 0.7, heartbeat: 0.9, ambient: 0.12,
+    },
+    /** 추적형이 이동하는 동안 발소리 간격. */
+    stalkerStepInterval: 0.5,
+    /** 보간한 위치가 한 프레임에 이만큼(타일) 넘게 움직여야 이동으로 본다. */
+    movedEpsilon: 0.005,
+    /** 소음 이벤트 위치가 내 위치와 이 거리 안이면 내 소음으로 보고 무시한다. */
+    selfNoiseTolerance: 1.5,
+    /** 동료 뛰는 소리 최소 간격(서버는 틱마다 소음을 낸다). */
+    teammateRunInterval: 0.25,
+    /** 지직거리는 형광등이 들리는 거리, 그리고 지직 소리 최소 간격. */
+    buzzRange: 6,
+    buzzMinInterval: 0.08,
+    /** 심장 소리 박동 간격: 위험 거리 끝에서 / 바로 곁에서. */
+    heartbeatSlowInterval: 1,
+    heartbeatFastInterval: 0.45,
+    /** 마스터 음량이 바뀔 때 부드럽게 따라가는 시간 상수. */
+    fadeSeconds: 0.03,
+  },
 } as const;

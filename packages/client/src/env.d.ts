@@ -12,5 +12,7 @@ interface Window {
     readonly selfId: string | null;
     getState(): unknown;
     getRender(): unknown;
+    /** 소리 상태: AudioContext 상태, 켜짐, 음량. 게임 화면이 아니면 null. */
+    getAudio(): unknown;
   };
 }
