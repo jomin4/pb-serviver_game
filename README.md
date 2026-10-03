@@ -1,6 +1,6 @@
 # 지하주차장 (basement-horror)
 
-[![CI](https://github.com/jomin4/pb-serviver_game/actions/workflows/ci.yml/badge.svg?branch=ccr-07fd93bb-obo8mr)](https://github.com/jomin4/pb-serviver_game/actions/workflows/ci.yml)
+[![CI](https://github.com/jomin4/recent-superpowers-project/actions/workflows/ci.yml/badge.svg?branch=ccr-07fd93bb-obo8mr)](https://github.com/jomin4/recent-superpowers-project/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Colyseus](https://img.shields.io/badge/Colyseus-0.18-FF5A5F)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
@@ -309,8 +309,8 @@ flowchart LR
 ### 설치와 개발 서버
 
 ```bash
-git clone https://github.com/jomin4/pb-serviver_game.git
-cd pb-serviver_game
+git clone https://github.com/jomin4/recent-superpowers-project.git
+cd recent-superpowers-project
 git checkout ccr-07fd93bb-obo8mr
 npm install
 npm run dev
