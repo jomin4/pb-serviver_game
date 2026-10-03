@@ -1,0 +1,26 @@
+{
+  "name": "basement-horror",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "serve": "node scripts/serve.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run typecheck && vitest run",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "tsx": "^4",
+    "typescript": "^7",
+    "vitest": "^5"
+  }
+}

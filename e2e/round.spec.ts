@@ -1,0 +1,146 @@
+import { expect, test } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
+
+type Debug = { selfId: string | null; getState(): unknown };
+type PlayerJson = { x: number; y: number; alive?: boolean };
+type StateJson = { players?: Record<string, PlayerJson> } | null;
+
+/** 브라우저 안의 디버그 훅(`?debug=1`)에서 특정 플레이어의 x를 읽는다. 아직 없으면 null. */
+async function playerX(page: Page, id: string): Promise<number | null> {
+  return page.evaluate((who) => {
+    const dbg = (window as unknown as { __bhDebug?: Debug }).__bhDebug;
+    const state = dbg?.getState() as StateJson;
+    return state?.players?.[who]?.x ?? null;
+  }, id);
+}
+
+async function selfId(page: Page): Promise<string> {
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __bhDebug?: Debug }).__bhDebug?.selfId ?? null)).not.toBeNull();
+  return page.evaluate(() => (window as unknown as { __bhDebug: Debug }).__bhDebug.selfId as string);
+}
+
+/** 두 명이 모여 시작한 게임 화면을 만든다. 반환한 페이지는 둘 다 게임 화면이다. */
+async function startTwoPlayerGame(browser: Browser) {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+
+  await a.goto('/?debug=1');
+  await a.getByTestId('nickname-input').fill('가');
+  await a.getByTestId('create-button').click();
+  const link = await a.getByTestId('invite-link').inputValue();
+
+  await b.goto(`${link}&debug=1`);
+  await b.getByTestId('nickname-input').fill('나');
+  await b.getByTestId('join-button').click();
+
+  for (const page of [a, b]) {
+    const names = page.getByTestId('player-list').getByTestId('player-item');
+    await expect(names).toHaveCount(2);
+    await expect(page.getByTestId('player-list')).toContainText('가');
+    await expect(page.getByTestId('player-list')).toContainText('나');
+  }
+  return { a, b, ctxA, ctxB };
+}
+
+test('두 명이 링크로 모여 라운드를 시작하고 움직인다', async ({ browser }) => {
+  const { a, b, ctxA, ctxB } = await startTwoPlayerGame(browser);
+  try {
+    await a.screenshot({ path: 'test-results/lobby.png' });
+
+    await a.getByTestId('start-button').click();
+    for (const page of [a, b]) {
+      await expect(page.getByTestId('game-screen')).toBeVisible();
+      await expect(page.getByTestId('hud-clock')).toHaveText(/^00:0/);
+    }
+
+    const idA = await selfId(a);
+    await expect.poll(() => playerX(b, idA)).not.toBeNull();
+    const before = (await playerX(b, idA)) as number;
+
+    await a.keyboard.down('KeyD');
+    await a.waitForTimeout(1000);
+    await a.keyboard.up('KeyD');
+
+    await expect.poll(async () => ((await playerX(b, idA)) ?? before) - before, { timeout: 10_000 }).toBeGreaterThan(0.5);
+    await a.screenshot({ path: 'test-results/game-a.png' });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+/** 브라우저 안의 디버그 훅에서 특정 플레이어의 alive를 읽는다. 아직 없으면 null. */
+async function playerAlive(page: Page, id: string): Promise<boolean | null> {
+  return page.evaluate((who) => {
+    const dbg = (window as unknown as { __bhDebug?: Debug }).__bhDebug;
+    const state = dbg?.getState() as StateJson;
+    return state?.players?.[who]?.alive ?? null;
+  }, id);
+}
+
+test('라운드 중 탭을 닫으면 끊김(재접속 유예)이 아니라 나가기로 처리된다', async ({ browser }) => {
+  const { a, b, ctxA, ctxB } = await startTwoPlayerGame(browser);
+  try {
+    await a.getByTestId('start-button').click();
+    for (const page of [a, b]) await expect(page.getByTestId('game-screen')).toBeVisible();
+    const idB = await selfId(b);
+    await expect.poll(() => playerAlive(a, idB)).toBe(true);
+
+    await b.close();
+    // 끊김이면 재접속 유예(20초) 동안 살아 있다. 나가기면 곧바로 사망 처리된다.
+    await expect.poll(() => playerAlive(a, idB), { timeout: 2_000 }).toBe(false);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+test('없는 방 코드는 안내 문구를 보여 준다', async ({ page }) => {
+  await page.goto('/?room=ABCDEF&debug=1');
+  await page.getByTestId('nickname-input').fill('가');
+  await page.getByTestId('join-button').click();
+  await expect(page.getByTestId('error-text')).toHaveText('방을 찾을 수 없습니다. 코드를 확인해 주세요');
+});
+
+test('게임 중 Esc로 메뉴가 열린다', async ({ browser }) => {
+  const { a, ctxA, ctxB } = await startTwoPlayerGame(browser);
+  try {
+    await a.getByTestId('start-button').click();
+    await expect(a.getByTestId('game-screen')).toBeVisible();
+    await a.keyboard.press('Escape');
+    await expect(a.getByTestId('menu')).toBeVisible();
+    await expect(a.getByTestId('menu-leave')).toBeVisible();
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+test('방 코드 칸: 헷갈리는 문자는 바로 안내하고, 초대 링크를 통째로 붙여 넣어도 입장한다', async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  try {
+    const a = await ctxA.newPage();
+    const b = await ctxB.newPage();
+    await a.goto('/?debug=1');
+    await a.getByTestId('nickname-input').fill('가');
+    await a.getByTestId('create-button').click();
+    const link = await a.getByTestId('invite-link').inputValue();
+
+    await b.goto('/?debug=1');
+    await b.getByTestId('nickname-input').fill('나');
+    await b.getByTestId('code-input').fill('ABCDE0');
+    await b.getByTestId('join-button').click();
+    await expect(b.getByTestId('code-error')).toHaveText('방을 찾을 수 없습니다. 코드를 확인해 주세요');
+
+    await b.getByTestId('code-input').fill(link);
+    await expect(b.getByTestId('code-input')).toHaveValue(link); // 잘리지 않는다
+    await b.getByTestId('join-button').click();
+    await expect(b.getByTestId('player-list').getByTestId('player-item')).toHaveCount(2);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});

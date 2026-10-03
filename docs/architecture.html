@@ -1,0 +1,116 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Basement Horror 아키텍처</title>
+<style>:root{--bg:#fafaf7;--fg:#1d1d1b;--card:#fff;--line:#ddd}
+@media (prefers-color-scheme: dark){:root{--bg:#16171a;--fg:#e8e6e1;--card:#1f2024;--line:#33353a}}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+main{max-width:1200px;margin:0 auto} h1{font-size:22px} h2{font-size:17px;margin:0 0 12px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:16px 0;overflow-x:auto}
+.mermaid{display:block;margin:0}.mermaid svg{flex:none;max-width:none!important}</style></head>
+<body><main><h1>Basement Horror · 아키텍처</h1><section><h2>1. 전체 구조</h2><pre class="mermaid">flowchart LR
+  subgraph B[&quot;브라우저 · packages/client&quot;]
+    C[&quot;Vite + Canvas&lt;br/&gt;화면 · 입력 · 예측 · 조명 · 소리&quot;]
+  end
+  subgraph S[&quot;Node 서버 · packages/server :2567&quot;]
+    R[&quot;RoundRoom&lt;br/&gt;대기실 · 20Hz 틱 · 입력 큐 · 재접속&quot;]
+    A[&quot;app.ts&lt;br/&gt;express · /healthz · 정적 파일&quot;]
+  end
+  subgraph SH[&quot;@bh/shared · 결정적 게임 규칙&quot;]
+    ST[&quot;step(world, inputs, dt)&quot;]
+    CF[&quot;CONFIG&lt;br/&gt;모든 조정 수치&quot;]
+  end
+  C &lt;--&gt;|&quot;WebSocket (Colyseus)&lt;br/&gt;input · start · again →&lt;br/&gt;← 상태 패치 · event · roundError&quot;| R
+  R --&gt;|&quot;매 틱 실행&quot;| ST
+  C --&gt;|&quot;예측 이동 · 시야 계산에&lt;br/&gt;같은 코드 사용&quot;| SH
+  A -.-&gt;|&quot;npm run serve:&lt;br/&gt;빌드된 client/dist 제공&quot;| B
+  E2E[&quot;e2e/ Playwright&quot;] -.-&gt;|&quot;npm run e2e&quot;| A
+</pre></section><section><h2>2. 클라이언트 모듈 (packages/client/src)</h2><pre class="mermaid">flowchart LR
+  MAIN[&quot;main.ts&lt;br/&gt;화면 전환 · 방 입장 · 재접속&quot;]
+  MAIN --&gt; SCREENS[&quot;ui/screens.ts&lt;br/&gt;첫 화면 · 대기실 · 결과&quot;]
+  MAIN --&gt; NET[&quot;net/&lt;br/&gt;connection.ts (@colyseus/sdk)&lt;br/&gt;url.ts (?room= 초대 링크)&quot;]
+  MAIN --&gt; GAME[&quot;game.ts&lt;br/&gt;rAF 프레임 루프&quot;]
+  GAME --&gt; IN
+  GAME --&gt; SIM
+  GAME --&gt; RND
+  GAME --&gt; UI[&quot;ui/hud.ts · ui/menu.ts (Esc)&quot;]
+  GAME --&gt; AU
+  subgraph IN[&quot;input/&quot;]
+    direction TB
+    KB[&quot;keyboard.ts&lt;br/&gt;키·마우스 → InputState&quot;]
+    CLK[&quot;sampleClock.ts&lt;br/&gt;60Hz 고정 샘플 · alpha&quot;]
+    SND[&quot;sender.ts&lt;br/&gt;33ms마다 묶어 전송&quot;]
+  end
+  subgraph SIM[&quot;sim/&quot;]
+    direction TB
+    PRED[&quot;prediction.ts&lt;br/&gt;내 캐릭터 예측 · 보정&quot;]
+    SMO[&quot;smoothing.ts&lt;br/&gt;예측 사이 보간&quot;]
+    INT[&quot;interpolation.ts&lt;br/&gt;다른 엔티티 100ms 지연 보간&quot;]
+    SNAP[&quot;snapshot.ts&lt;br/&gt;스키마 → 순수 상태&quot;]
+  end
+  subgraph RND[&quot;render/&quot;]
+    direction TB
+    REN[&quot;renderer.ts&quot;] --&gt; CAM[&quot;camera.ts&quot;] &amp; MAPL[&quot;mapLayer.ts&lt;br/&gt;바닥·벽&quot;] &amp; LIT[&quot;lighting.ts&lt;br/&gt;어둠 · 손전등&quot;] &amp; DT[&quot;drawTable.ts&lt;br/&gt;엔티티 그리기&quot;]
+    VIS[&quot;visibility.ts&lt;br/&gt;보이는 것만 남김&quot;]
+  end
+  subgraph AU[&quot;audio/&quot;]
+    direction TB
+    DIR[&quot;director.ts&lt;br/&gt;상황 → 효과음&quot;] --&gt; AUD[&quot;audio.ts&quot;] --&gt; SPA[&quot;spatial.ts&lt;br/&gt;거리·방향&quot;]
+  end
+</pre></section><section><h2>3. 서버와 공용 규칙 모듈</h2><pre class="mermaid">flowchart LR
+  subgraph SERVER[&quot;packages/server/src&quot;]
+    direction TB
+    IDX[&quot;index.ts&lt;br/&gt;실행 진입점 · 포트 2567&quot;] --&gt; APP[&quot;app.ts&lt;br/&gt;express · /healthz · 정적 파일&quot;] --&gt; ROOM[&quot;RoundRoom.ts&lt;br/&gt;대기실 · 20Hz 틱 · 입력 큐&lt;br/&gt;재접속 유예 · 메시지 제한&quot;]
+    ROOM --&gt; LOBBY[&quot;lobby.ts&lt;br/&gt;닉네임 · 방장 넘기기&quot;]
+    ROOM --&gt; SCHEMA[&quot;schema.ts&lt;br/&gt;World → 동기화 스키마&quot;]
+  end
+  subgraph SHARED[&quot;packages/shared/src (결정적 · 순수 함수)&quot;]
+    direction TB
+    STEP[&quot;step.ts&lt;br/&gt;step(world, inputs, dt)&quot;]
+    STEP --&gt; INP[&quot;input.ts&lt;br/&gt;sanitize · cap&quot;]
+    STEP --&gt; MOVE[&quot;movement.ts&lt;br/&gt;이동 · 스태미나 · 계단&quot;]
+    STEP --&gt; ITEMS[&quot;items.ts&lt;br/&gt;줍기 · 버리기 · 적재&quot;]
+    STEP --&gt; GHOST[&quot;ghost.ts&lt;br/&gt;유령 이동 · 깜빡이기&quot;]
+    STEP --&gt; COMMS[&quot;comms.ts&lt;br/&gt;핑 · 퀵챗&quot;]
+    STEP --&gt; NOISE[&quot;noise.ts&lt;br/&gt;소음&quot;]
+    STEP --&gt; MON[&quot;monsters/&lt;br/&gt;stalker (추적형) · watcher (시선형)&quot;]
+    STEP --&gt; ROUND[&quot;round.ts&lt;br/&gt;createWorld · 시계 · 출발 판정&quot;]
+    MON --&gt; PATH[&quot;pathfinding.ts&lt;br/&gt;A*&quot;]
+    MON --&gt; VISION[&quot;vision.ts&lt;br/&gt;시야 · 손전등 판정&quot;]
+    MOVE &amp; PATH &amp; VISION --&gt; MAP[&quot;map/&lt;br/&gt;parking-lot.json · grid · validate&quot;]
+    CONFIG[&quot;config.ts&lt;br/&gt;CONFIG: 모든 조정 수치&quot;]
+    MISC[&quot;rng · geometry · roomCode · types&quot;]
+  end
+  ROOM --&gt;|&quot;매 틱&quot;| STEP
+  ROOM --&gt;|&quot;createWorld&quot;| ROUND
+</pre></section><section><h2>4. 한 프레임 · 한 틱의 데이터 흐름</h2><pre class="mermaid">sequenceDiagram
+  autonumber
+  participant P as 플레이어
+  participant G as game.ts (rAF)
+  participant PR as prediction + smoothing
+  participant SD as sender.ts
+  participant RM as RoundRoom (20Hz)
+  participant SH as shared step()
+  participant O as 다른 클라이언트
+
+  P-&gt;&gt;G: 키·마우스 (keyboard.ts → InputState)
+  loop 매 프레임 (모니터 주사율)
+    G-&gt;&gt;G: sampleClock: 1/60초마다 입력 샘플
+    G-&gt;&gt;PR: 샘플마다 1/60초 예측 이동
+    G-&gt;&gt;SD: 입력 쌓기 (seq 증가)
+    G-&gt;&gt;G: 직전·현재 예측을 alpha로 보간해 그림 · 카메라 따라감
+  end
+  SD-&gt;&gt;RM: 33ms마다 input 묶음
+  RM-&gt;&gt;RM: 큐에 넣기 (최대 10개)
+  loop 50ms 틱
+    RM-&gt;&gt;SH: step(world, 큐, dt)
+    SH-&gt;&gt;SH: 입력마다 1/60초 적용 (흐른 시간 예산만큼)&lt;br/&gt;→ 상호작용 → 배터리 → 몬스터 → 피해·사망 → 출발·시계
+    SH--&gt;&gt;RM: 새 world · events
+    RM-&gt;&gt;RM: 쓰지 않은 입력은 큐에 남김
+    RM--&gt;&gt;G: 상태 패치 (schema) + event
+    RM--&gt;&gt;O: 상태 패치 + event
+  end
+  G-&gt;&gt;PR: reconcile: 서버 위치 + 아직 처리 안 된 입력 다시 적용
+  O-&gt;&gt;O: 다른 엔티티는 100ms 지연 보간해 그림
+</pre></section></main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'default',flowchart:{useMaxWidth:false},sequence:{useMaxWidth:false},themeVariables:{fontFamily:'Malgun Gothic, sans-serif'}});</script>
+</body></html>
