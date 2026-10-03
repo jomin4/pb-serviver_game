@@ -66,6 +66,11 @@ export const CONFIG = {
     maxMessagesPerSecond: 60, maxInputsPerBatch: 10, maxDt: 0.1, nicknameMax: 10, roomCodeLength: 6, interpolationMs: 100,
     /** 클라이언트가 입력을 샘플링하는 고정 빈도(Hz). 모니터 주사율과 무관하게 서버 틱당 입력 수를 한도 아래로 유지한다. */
     inputSampleHz: 60,
+    /**
+     * 서버가 입력 하나를 1/inputSampleHz초로 적용할 때 쌓아 둘 수 있는 입력 시간(초). 늦게 온 입력을 이만큼까지
+     * 따라잡고, 입력이 끊기면 이를 넘는 시간은 중립 입력으로 흐른다. 많이 보내도 이보다 빨리 움직일 수 없다.
+     */
+    inputBudgetMax: 0.2,
   },
   /** 화면 기준 해상도(px)와 1타일의 기준 px(스펙 4.1). */
   view: { width: 960, height: 540, tilePx: 32 },

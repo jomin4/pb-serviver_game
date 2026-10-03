@@ -61,6 +61,7 @@ export function createWorld(params: { mapId: string; seed: number; players: { id
     })),
     round: { clock: 0, target: difficulty.target, truckTotal: 0, phase: 'playing', watcherSpawned: false, lightsHalved: false, horned: false },
     events: [],
+    inputBudget: {},
   };
 }
 

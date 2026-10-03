@@ -48,6 +48,7 @@ export function cloneWorld(world: World): World {
     lights: world.lights.map((l) => ({ ...l, pos: copyVec(l.pos) })),
     round: { ...world.round },
     events: world.events.map(cloneEvent),
+    inputBudget: { ...world.inputBudget },
   };
 }
 
@@ -64,13 +65,18 @@ type TickSummary = {
 /** 이동 거리가 이 값 미만이면 "움직이지 않았다"로 본다(타일). */
 const MOVED_EPS = 0.01;
 
-/** 입력이 없는 틱에 쓰는 중립 입력: 서 있고, 조준·누르고 있던 상호작용은 유지, 엣지 동작 없음. */
-function neutralInput(p: PlayerState): PlayerInput {
+/** 입력이 끊긴 시간에 쓰는 중립 입력: 서 있고, 조준·누르고 있던 상호작용은 유지, 엣지 동작 없음. */
+function neutralInput(p: PlayerState, interact: boolean): PlayerInput {
   return {
     seq: p.lastSeq, move: { x: 0, y: 0 }, run: false, aim: p.aim, toggleFlashlight: false,
-    interact: p.prevInteract, drop: false, selectSlot: null, ping: null, chat: null, flicker: false,
+    interact, drop: false, selectSlot: null, ping: null, chat: null, flicker: false,
   };
 }
+
+/** 입력 하나가 대표하는 시간(초). 클라이언트 예측(`SampleClock.step`)과 같은 값이어야 위치가 어긋나지 않는다. */
+const INPUT_DT = 1 / CONFIG.net.inputSampleHz;
+/** 부동소수 오차로 정확히 한 입력 분량이 모자라 보이는 경우를 막는다. */
+const BUDGET_EPS = 1e-9;
 
 /**
  * seq 오름차순, 이미 처리한 seq 이하와 중복은 버리고, 마지막 maxInputsPerBatch개만 남긴다
@@ -164,13 +170,21 @@ export function step(world: World, inputsByPlayer: Record<string, PlayerInput[]>
       startFloor: p0.floor, startPos: { x: p0.pos.x, y: p0.pos.y },
     };
     summaries[id] = summary;
-    if (inputs.length === 0) {
-      applyOneInput(w, map, id, neutralInput(p0), dt, summary);
-    } else {
-      const inputDt = dt / inputs.length;
-      for (const input of inputs) applyOneInput(w, map, id, input, inputDt, summary);
-      w.players[id]!.lastSeq = inputs[inputs.length - 1]!.seq;
+    // 입력마다 INPUT_DT초를 적용하되, 실제 흐른 시간(예산)만큼만 쓴다. 남은 입력은 서버 큐에 남아 다음 틱에 온다.
+    let budget = (w.inputBudget[id] ?? 0) + dt;
+    for (const input of inputs) {
+      if (budget < INPUT_DT - BUDGET_EPS) break;
+      applyOneInput(w, map, id, input, INPUT_DT, summary);
+      w.players[id]!.lastSeq = input.seq;
+      budget = Math.max(0, budget - INPUT_DT);
     }
+    // 입력이 끊겨 예산이 넘치면 넘친 시간만큼은 서 있는 것으로 흐른다(스태미나 회복 등).
+    if (budget > CONFIG.net.inputBudgetMax) {
+      const idle = budget - CONFIG.net.inputBudgetMax;
+      budget = CONFIG.net.inputBudgetMax;
+      applyOneInput(w, map, id, neutralInput(w.players[id]!, summary.latestInteract), idle, summary);
+    }
+    w.inputBudget[id] = budget;
   }
 
   // 2b. 이동 소음: 틱당 플레이어당 한 번, 최종 위치에서

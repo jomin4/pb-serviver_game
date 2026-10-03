@@ -5,8 +5,12 @@ import type { PlayerInput, World } from '../src/types.ts';
 import { makeInput, makeItem, makeParkingWorld, makeStalker } from './fixtures/world.ts';
 
 const DT = 0.05;
+/** 실제 클라이언트처럼 한 틱에 보내는 입력 수(입력 하나 = 1/inputSampleHz초). */
+const PER_TICK = Math.round(DT * CONFIG.net.inputSampleHz);
+/** 한 틱의 두 번째 입력부터는 엣지 동작을 지운다(엣지는 틱의 첫 입력에만 담는다). */
+const NO_EDGES: Partial<PlayerInput> = { toggleFlashlight: false, drop: false, flicker: false, selectSlot: null, ping: null, chat: null };
 
-/** 입력을 매 틱 새 seq로 보내며 `ticks`틱 진행한다. */
+/** 매 틱 같은 입력을 PER_TICK개(새 seq)씩 보내며 `ticks`틱 진행한다. */
 function simulate(
   start: World,
   ticks: number,
@@ -17,7 +21,8 @@ function simulate(
   for (let t = 0; t < ticks; t++) {
     const batch: Record<string, PlayerInput[]> = {};
     for (const [id, partial] of Object.entries(inputsAt(t))) {
-      batch[id] = [makeInput({ ...partial, seq: w.players[id]!.lastSeq + 1 })];
+      const seq = w.players[id]!.lastSeq + 1;
+      batch[id] = Array.from({ length: PER_TICK }, (_, k) => makeInput({ ...partial, ...(k > 0 ? NO_EDGES : {}), seq: seq + k }));
     }
     w = step(w, batch, DT);
     after?.(w, t);

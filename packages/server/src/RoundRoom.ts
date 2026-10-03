@@ -123,13 +123,25 @@ export class RoundRoom extends Room<{ state: RoomState }> {
     console.info({ event: 'roundStarted', roomId: this.roomId, seed, players: players.map((p) => p.name) });
   }
 
+  /** step이 아직 쓰지 않은 입력(seq > lastSeq). step은 실제 흐른 시간만큼만 입력을 쓰므로 나머지는 다음 틱으로 넘긴다. */
+  private unusedInputs(world: World): Record<string, PlayerInput[]> {
+    const out: Record<string, PlayerInput[]> = {};
+    for (const [id, queue] of Object.entries(this.queues)) {
+      const p = world.players[id];
+      if (!p) continue;
+      const rest = queue.filter((i) => i.seq > p.lastSeq);
+      if (rest.length > 0) out[id] = rest;
+    }
+    return out;
+  }
+
   /** 한 틱. 오류는 이 방의 라운드만 끝낸다. */
   private tick(deltaMs: number): void {
     const world = this.world;
     if (!world || this.state.phase !== 'playing') return;
     try {
       this.world = this.stepFn(world, this.queues, deltaMs / 1000);
-      this.queues = {};
+      this.queues = this.unusedInputs(this.world);
       syncSchema(this.world, this.state);
       const events = this.pendingEvents.concat(this.world.events);
       this.pendingEvents = [];

@@ -51,4 +51,6 @@ export type GameEvent =
 export type World = { tick: number; time: number; seed: number; rngState: number;
   mapId: string; playerCount: number; players: Record<string, PlayerState>;
   items: Record<string, ItemState>; stalkers: StalkerState[]; watcher: WatcherState;
-  lights: LightState[]; round: RoundState; events: GameEvent[] };
+  lights: LightState[]; round: RoundState; events: GameEvent[];
+  /** 플레이어별로 아직 쓰지 않은 입력 시간(초, 최대 `CONFIG.net.inputBudgetMax`). 없으면 0. */
+  inputBudget: Record<string, number> };

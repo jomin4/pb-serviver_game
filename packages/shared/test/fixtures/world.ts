@@ -69,6 +69,7 @@ export function makeWorld(partial: Partial<World> = {}): World {
     lights: [],
     round: { clock: 0, target: 250, truckTotal: 0, phase: 'playing', watcherSpawned: false, lightsHalved: false, horned: false },
     events: [],
+    inputBudget: {},
     ...partial,
   };
 }

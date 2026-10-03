@@ -41,11 +41,18 @@ const recording = (w: World, inputs: Record<string, PlayerInput[]>, dt: number):
   for (const q of Object.values(inputs)) queueSizes.push(q.length);
   return step(w, inputs, dt);
 };
+// frozen: 입력을 하나도 쓰지 않는 step(틱만 센다). 쓰지 못한 입력이 큐에 남는지 본다.
+const frozenSizes: number[] = [];
+const frozen = (w: World, inputs: Record<string, PlayerInput[]>): World => {
+  for (const q of Object.values(inputs)) frozenSizes.push(q.length);
+  return { ...w, tick: w.tick + 1 };
+};
 const gameServer = defineServer({
   rooms: {
     round: defineRoom(RoundRoom, { reconnectSeconds: 1 }),
     flaky: defineRoom(RoundRoom, { reconnectSeconds: 1, stepFn: flaky }),
     recording: defineRoom(RoundRoom, { stepFn: recording }),
+    frozen: defineRoom(RoundRoom, { stepFn: frozen }),
     plain: defineRoom(RoundRoom),
   },
 });
@@ -348,7 +355,7 @@ describe('RoundRoom 오류 격리', () => {
 });
 
 describe('RoundRoom 입력 큐', () => {
-  it('틱마다 플레이어당 최근 10개까지만 step에 넘기고, 넘긴 뒤 큐를 비운다', async () => {
+  it('틱마다 플레이어당 최근 10개까지만 step에 넘기고, step이 쓴 입력은 큐에서 빠진다', async () => {
     const room = await colyseus.createRoom('recording', opts('방장')) as RoundRoom;
     const host = await colyseus.connectTo(room, opts('방장'));
     await waitFor(() => room.state.players.size === 1);
@@ -360,11 +367,25 @@ describe('RoundRoom 입력 큐', () => {
     for (let m = 0; m < 6; m++) host.send('input', Array.from({ length: 10 }, (_, i) => input(m * 10 + i + 1)));
     await waitFor(() => room.state.players.get(host.sessionId)!.lastSeq === 60);
     expect(Math.max(...queueSizes)).toBeLessThanOrEqual(CONFIG.net.maxInputsPerBatch);
-    // 입력이 없는 틱에는 빈 큐가 넘어간다(큐가 비워졌다)
+    // 모두 쓴 뒤 입력이 없는 틱에는 빈 큐가 넘어간다(큐가 비워졌다)
     const tick = room.world!.tick;
     queueSizes.length = 0;
     await waitFor(() => room.world!.tick >= tick + 3);
     expect(queueSizes.every((n) => n === 0)).toBe(true);
+  });
+});
+
+describe('RoundRoom 입력 큐: 쓰지 못한 입력', () => {
+  it('step이 아직 쓰지 않은 입력(seq > lastSeq)은 큐에 남아 다음 틱에 다시 넘어간다', async () => {
+    const room = await colyseus.createRoom('frozen', opts('방장')) as RoundRoom;
+    const host = await colyseus.connectTo(room, opts('방장'));
+    await waitFor(() => room.state.players.size === 1);
+    host.send('start');
+    await waitFor(() => room.world !== null && room.world.tick >= 2);
+    frozenSizes.length = 0;
+    host.send('input', [input(1), input(2), input(3)]);
+    await waitFor(() => frozenSizes.filter((n) => n === 3).length >= 3);
+    expect(frozenSizes.filter((n) => n > 0).every((n) => n === 3)).toBe(true);
   });
 });
 

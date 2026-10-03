@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/config.ts';
 import { getMap } from '../src/map/index.ts';
+import { applyPlayerMovement } from '../src/movement.ts';
 import { createWorld } from '../src/round.ts';
 import { cloneWorld, step } from '../src/step.ts';
 import type { GameEvent, PlayerInput, World } from '../src/types.ts';
@@ -150,7 +151,8 @@ describe('step: 입력 선별', () => {
     expect(ofType(out, 'chat')).toEqual([{ type: 'chat', playerId: 'a', index: 1 }]);
     expect(out.players.a!.flashlightOn).toBe(!w.players.a!.flashlightOn);
     expect(out.players.a!.pos.x).toBe(start); // 이동은 접지 않는다
-    expect(out.players.a!.lastSeq).toBe(12);
+    // 남은 10개(seq 3~12) 중 이 틱에 흐른 시간만큼(입력 하나 = 1/inputSampleHz초)만 쓴다
+    expect(out.players.a!.lastSeq).toBe(2 + Math.round(DT * CONFIG.net.inputSampleHz));
   });
 
   it('입력이 없으면 중립 입력을 쓴다: 가만히 서 있고 aim은 그대로', () => {
@@ -322,7 +324,7 @@ describe('step: 유령', () => {
     const w = ghostWorld();
     w.players.a!.pos = { x: 1.5, y: 20.5 };
     const out = step(w, { a: [makeInput({ seq: 1, move: { x: -1, y: 0 } })] }, DT);
-    expect(out.players.a!.pos.x).toBeCloseTo(1.5 - CONFIG.ghost.speed * DT, 6);
+    expect(out.players.a!.pos.x).toBeCloseTo(1.5 - CONFIG.ghost.speed / CONFIG.net.inputSampleHz, 6); // 입력 하나 분량
   });
 
   it('유령은 끼임 해소 대상이 아니다', () => {
@@ -606,3 +608,65 @@ describe('step: 끼임 해소', () => {
     expect(overlapsSolid(map, 0, out.watcher.pos, CONFIG.watcher.radius)).toBe(false);
   });
 });
+
+describe('step: 입력 하나 = 1/inputSampleHz초 (클라이언트 예측과 같은 시간)', () => {
+  const STEP = 1 / CONFIG.net.inputSampleHz;
+  const BUDGET = CONFIG.net.inputBudgetMax;
+  const right = (seq: number): PlayerInput => makeInput({ seq, move: { x: 1, y: 0 } });
+  const seqs = (from: number, to: number): PlayerInput[] => Array.from({ length: to - from + 1 }, (_, i) => right(from + i));
+  /** 클라이언트 예측처럼 입력마다 STEP초씩 적용한 위치. */
+  const predicted = (w: World, inputs: PlayerInput[]) => {
+    const map = getMap(w.mapId);
+    let p = w.players.a!;
+    for (const input of inputs) p = applyPlayerMovement(map, p, input, w.items, STEP);
+    return p.pos;
+  };
+
+  it('틱 dt를 입력 수로 나누지 않고 입력마다 STEP초를 적용한다(서버 위치가 예측과 같다)', () => {
+    const w = makeParkingWorld(['a']);
+    const out = step(w, { a: seqs(1, 2) }, DT); // 50ms 틱에 입력 2개(33ms 묶음)
+    const want = predicted(w, seqs(1, 2));
+    expect(out.players.a!.pos.x).toBeCloseTo(want.x, 9);
+    expect(out.players.a!.pos.y).toBeCloseTo(want.y, 9);
+    expect(out.players.a!.lastSeq).toBe(2);
+  });
+
+  it('실제 흐른 시간보다 많은 입력은 쓰지 않고 남긴다(lastSeq는 쓴 입력까지)', () => {
+    const w = makeParkingWorld(['a']);
+    const once = step(w, { a: seqs(1, 6) }, DT);
+    expect(once.players.a!.lastSeq).toBe(3);
+    const twice = step(once, { a: seqs(1, 6) }, DT); // 서버는 남은 입력을 다시 넘긴다
+    expect(twice.players.a!.lastSeq).toBe(6);
+    expect(twice.players.a!.pos.x).toBeCloseTo(predicted(w, seqs(1, 6)).x, 9);
+  });
+
+  it(`늦게 온 입력은 쓰지 않은 시간(최대 inputBudgetMax=${BUDGET}초)으로 따라잡는다`, () => {
+    let w = makeParkingWorld(['a']);
+    const start = w;
+    w = step(w, {}, DT);
+    w = step(w, {}, DT); // 입력이 늦어 0.1초 동안 아무것도 못 받음
+    const out = step(w, { a: seqs(1, 9) }, DT); // 0.15초 분량이 한꺼번에 도착
+    expect(out.players.a!.lastSeq).toBe(9);
+    expect(out.players.a!.pos.x).toBeCloseTo(predicted(start, seqs(1, 9)).x, 9);
+  });
+
+  it('입력을 보내지 않으면(탭 숨김·끊김) inputBudgetMax를 넘는 시간만 중립 입력으로 흐른다', () => {
+    let w = makeParkingWorld(['a']);
+    w.players.a!.stamina = 0;
+    w.players.a!.exhausted = true;
+    for (let i = 0; i < 20; i++) w = step(w, {}, DT); // 1초
+    expect(w.players.a!.stamina).toBeCloseTo(CONFIG.player.staminaRegen * (1 - BUDGET), 9);
+  });
+
+  it('입력을 많이 보내도 1초에 쓰는 입력 시간은 1초 + inputBudgetMax를 넘지 않는다(속도 조작 방지)', () => {
+    let w = makeParkingWorld(['a']);
+    w.players.a!.stamina = 0;
+    w.players.a!.exhausted = true;
+    let seq = 1;
+    for (let i = 0; i < 20; i++) {
+      w = step(w, { a: Array.from({ length: CONFIG.net.maxInputsPerBatch }, () => makeInput({ seq: seq++ })) }, DT);
+    }
+    expect(w.players.a!.stamina).toBeLessThanOrEqual(CONFIG.player.staminaRegen * (1 + BUDGET) + 1e-9);
+  });
+});
+

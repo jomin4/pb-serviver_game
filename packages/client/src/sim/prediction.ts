@@ -13,9 +13,9 @@ export type Predictor = {
 type Pending = { input: PlayerInput; dt: number };
 
 /**
- * 내 캐릭터 예측 이동(스펙 3.3). 서버는 한 틱의 dt를 그 틱에 받은 입력 수로 나누므로 클라이언트가
- * 서버의 dt를 그대로 따라 할 수는 없다. 대신 각 입력을 만들 때 쓴 dt를 함께 보관했다가 같은 dt로 다시 적용한다.
- * dt는 서버와 같은 상한(`CONFIG.net.maxDt`)으로 제한한다.
+ * 내 캐릭터 예측 이동(스펙 3.3). 서버는 입력 하나를 1/`CONFIG.net.inputSampleHz`초로 적용하므로
+ * 클라이언트도 같은 dt(`SampleClock.step`)로 적용해야 보정할 때 위치가 튀지 않는다. 각 입력의 dt를 함께 보관했다가
+ * 같은 dt로 다시 적용한다. dt는 서버와 같은 상한(`CONFIG.net.maxDt`)으로 제한한다.
  *
  * 유령(`alive === false`)은 예측하지 않는다. 유령 이동(`applyGhostMovement`)은 서버 상태를 그대로 쓰고,
  * 대기열도 만들지 않는다(보정할 예측이 없으므로).
